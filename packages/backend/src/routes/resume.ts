@@ -204,7 +204,6 @@ router.post("/", async (req, res) => {
       path: err.path.join("."),
       message: err.message,
     }));
-    console.error("Validation errors:", JSON.stringify(errors, null, 2));
     return res.status(400).json({ errors });
   }
 
@@ -219,16 +218,52 @@ router.post("/", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    await connection.query("DELETE FROM resumes");
-
-    const [result] = await connection.query<ResultSetHeader>(
-      "INSERT INTO resumes (summary) VALUES (?)",
-      [data.summary || ""]
+    // Check if a resume exists
+    const [existing] = await connection.query<RowDataPacket[]>(
+      "SELECT id FROM resumes LIMIT 1"
     );
-    const resumeId = String(result.insertId);
 
-    console.log("Generated resumeId:", resumeId);
+    let resumeId: string;
 
+    if (existing.length > 0) {
+      // Update existing resume
+      resumeId = String(existing[0].id);
+      console.log("Updating existing resume ID:", resumeId);
+
+      await connection.query("UPDATE resumes SET summary = ? WHERE id = ?", [
+        data.summary || "",
+        resumeId,
+      ]);
+
+      // Delete all child records for this resume
+      await connection.query("DELETE FROM personal_info WHERE resume_id = ?", [
+        resumeId,
+      ]);
+      await connection.query(
+        "DELETE FROM skill_categories WHERE resume_id = ?",
+        [resumeId]
+      );
+      await connection.query(
+        "DELETE FROM experience_companies WHERE resume_id = ?",
+        [resumeId]
+      );
+      await connection.query("DELETE FROM projects WHERE resume_id = ?", [
+        resumeId,
+      ]);
+      await connection.query("DELETE FROM education WHERE resume_id = ?", [
+        resumeId,
+      ]);
+    } else {
+      // Insert new resume
+      const [result] = await connection.query<ResultSetHeader>(
+        "INSERT INTO resumes (summary) VALUES (?)",
+        [data.summary || ""]
+      );
+      resumeId = String(result.insertId);
+      console.log("Created new resume ID:", resumeId);
+    }
+
+    // ── Personal Info ──────────────────────────────────────────────────────
     await connection.query(
       `INSERT INTO personal_info 
          (resume_id, name, title, email, phone, location, linkedin, github, portfolio) 
@@ -246,6 +281,7 @@ router.post("/", async (req, res) => {
       ]
     );
 
+    // ── Skills ─────────────────────────────────────────────────────────────
     for (const skillCat of skills) {
       const [catResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO skill_categories (resume_id, category, display_order) VALUES (?, ?, ?)",
@@ -261,6 +297,7 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // ── Experience ─────────────────────────────────────────────────────────
     for (const company of experience) {
       const [companyResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO experience_companies (resume_id, company_name, location, display_order) VALUES (?, ?, ?, ?)",
@@ -298,6 +335,7 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // ── Projects ───────────────────────────────────────────────────────────
     for (const project of projects) {
       const [projectResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO projects (resume_id, name, url, display_order) VALUES (?, ?, ?, ?)",
@@ -313,6 +351,7 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // ── Education ──────────────────────────────────────────────────────────
     for (const edu of education) {
       await connection.query(
         `INSERT INTO education 
@@ -342,5 +381,4 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
-
 export default router;
