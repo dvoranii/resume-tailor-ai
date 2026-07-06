@@ -1,12 +1,10 @@
 import { Router } from "express";
 import { pool } from "../db";
-import { ResumeSchema } from "@resumeai/shared";
+import { ResumeSaveSchema } from "@resumeai/shared";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { ZodError, ZodIssue } from "zod";
 
 const router = Router();
-
-// ─── GET Resume ──────────────────────────────────────────────────────────────
 
 router.get("/", async (_req, res) => {
   const connection = await pool.getConnection();
@@ -14,12 +12,10 @@ router.get("/", async (_req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Get the first resume (single user for now)
     const [resumeRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, summary FROM resumes LIMIT 1"
     );
 
-    // If no resume exists, return empty structure
     if (resumeRows.length === 0) {
       await connection.commit();
       return res.json({
@@ -44,7 +40,6 @@ router.get("/", async (_req, res) => {
     const resumeId = resumeRows[0].id;
     const summary = resumeRows[0].summary;
 
-    // ── Personal Info ──────────────────────────────────────────────────────
     const [personalRows] = await connection.query<RowDataPacket[]>(
       "SELECT * FROM personal_info WHERE resume_id = ?",
       [resumeId]
@@ -60,7 +55,6 @@ router.get("/", async (_req, res) => {
       portfolio: "",
     };
 
-    // ── Skills ─────────────────────────────────────────────────────────────
     const [categoryRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, category, display_order FROM skill_categories WHERE resume_id = ? ORDER BY display_order",
       [resumeId]
@@ -73,7 +67,7 @@ router.get("/", async (_req, res) => {
           [cat.id]
         );
         return {
-          id: cat.id,
+          id: String(cat.id),
           category: cat.category,
           items: skillRows.map((row: RowDataPacket) => row.skill),
           displayOrder: cat.display_order,
@@ -81,7 +75,6 @@ router.get("/", async (_req, res) => {
       })
     );
 
-    // ── Experience ─────────────────────────────────────────────────────────
     const [companyRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, company_name, location, display_order FROM experience_companies WHERE resume_id = ? ORDER BY display_order",
       [resumeId]
@@ -101,14 +94,14 @@ router.get("/", async (_req, res) => {
               [role.id]
             );
             return {
-              id: role.id,
+              id: String(role.id),
               title: role.title,
               employmentType: role.employment_type,
               startDate: role.start_date,
               endDate: role.end_date,
               displayOrder: role.display_order,
               bullets: bulletRows.map((b: RowDataPacket) => ({
-                id: b.id,
+                id: String(b.id),
                 content: b.content,
                 displayOrder: b.display_order,
               })),
@@ -117,7 +110,7 @@ router.get("/", async (_req, res) => {
         );
 
         return {
-          id: company.id,
+          id: String(company.id),
           companyName: company.company_name,
           location: company.location,
           displayOrder: company.display_order,
@@ -126,7 +119,6 @@ router.get("/", async (_req, res) => {
       })
     );
 
-    // ── Projects ───────────────────────────────────────────────────────────
     const [projectRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, name, url, display_order FROM projects WHERE resume_id = ? ORDER BY display_order",
       [resumeId]
@@ -139,12 +131,12 @@ router.get("/", async (_req, res) => {
           [project.id]
         );
         return {
-          id: project.id,
+          id: String(project.id),
           name: project.name,
           url: project.url || "",
           displayOrder: project.display_order,
           bullets: bulletRows.map((b: RowDataPacket) => ({
-            id: b.id,
+            id: String(b.id),
             content: b.content,
             displayOrder: b.display_order,
           })),
@@ -152,14 +144,13 @@ router.get("/", async (_req, res) => {
       })
     );
 
-    // ── Education ──────────────────────────────────────────────────────────
     const [educationRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, institution, degree, field, graduation_year, display_order FROM education WHERE resume_id = ? ORDER BY display_order",
       [resumeId]
     );
 
     const education = educationRows.map((e: RowDataPacket) => ({
-      id: e.id,
+      id: String(e.id),
       institution: e.institution,
       degree: e.degree,
       field: e.field,
@@ -196,7 +187,15 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const parsed = ResumeSchema.safeParse(req.body);
+  const normalizedBody = {
+    ...req.body,
+    skills: req.body.skills || [],
+    experience: req.body.experience || [],
+    projects: req.body.projects || [],
+    education: req.body.education || [],
+  };
+
+  const parsed = ResumeSaveSchema.safeParse(normalizedBody);
 
   if (!parsed.success) {
     const zodError = parsed.error as unknown as ZodError;
@@ -208,17 +207,16 @@ router.post("/", async (req, res) => {
   }
 
   const data = parsed.data;
-  const skills = data.skills || [];
-  const experience = data.experience || [];
-  const projects = data.projects || [];
-  const education = data.education || [];
+  const skills = data.skills ?? [];
+  const experience = data.experience ?? [];
+  const projects = data.projects ?? [];
+  const education = data.education ?? [];
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    // Check if a resume exists
     const [existing] = await connection.query<RowDataPacket[]>(
       "SELECT id FROM resumes LIMIT 1"
     );
@@ -226,16 +224,13 @@ router.post("/", async (req, res) => {
     let resumeId: string;
 
     if (existing.length > 0) {
-      // Update existing resume
       resumeId = String(existing[0].id);
-      console.log("Updating existing resume ID:", resumeId);
 
       await connection.query("UPDATE resumes SET summary = ? WHERE id = ?", [
         data.summary || "",
         resumeId,
       ]);
 
-      // Delete all child records for this resume
       await connection.query("DELETE FROM personal_info WHERE resume_id = ?", [
         resumeId,
       ]);
@@ -254,16 +249,13 @@ router.post("/", async (req, res) => {
         resumeId,
       ]);
     } else {
-      // Insert new resume
       const [result] = await connection.query<ResultSetHeader>(
         "INSERT INTO resumes (summary) VALUES (?)",
         [data.summary || ""]
       );
       resumeId = String(result.insertId);
-      console.log("Created new resume ID:", resumeId);
     }
 
-    // ── Personal Info ──────────────────────────────────────────────────────
     await connection.query(
       `INSERT INTO personal_info 
          (resume_id, name, title, email, phone, location, linkedin, github, portfolio) 
@@ -281,7 +273,6 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    // ── Skills ─────────────────────────────────────────────────────────────
     for (const skillCat of skills) {
       const [catResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO skill_categories (resume_id, category, display_order) VALUES (?, ?, ?)",
@@ -289,7 +280,7 @@ router.post("/", async (req, res) => {
       );
       const catId = String(catResult.insertId);
 
-      for (let i = 0; i < skillCat.items.length; i++) {
+      for (let i = 0; i < (skillCat.items ?? []).length; i++) {
         await connection.query(
           "INSERT INTO skills (category_id, skill, display_order) VALUES (?, ?, ?)",
           [catId, skillCat.items[i], i]
@@ -297,7 +288,6 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // ── Experience ─────────────────────────────────────────────────────────
     for (const company of experience) {
       const [companyResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO experience_companies (resume_id, company_name, location, display_order) VALUES (?, ?, ?, ?)",
@@ -310,7 +300,7 @@ router.post("/", async (req, res) => {
       );
       const companyId = String(companyResult.insertId);
 
-      for (const role of company.roles || []) {
+      for (const role of company.roles ?? []) {
         const [roleResult] = await connection.query<ResultSetHeader>(
           `INSERT INTO experience_roles 
              (company_id, title, employment_type, start_date, end_date, display_order) 
@@ -326,7 +316,7 @@ router.post("/", async (req, res) => {
         );
         const roleId = String(roleResult.insertId);
 
-        for (let i = 0; i < role.bullets.length; i++) {
+        for (let i = 0; i < (role.bullets ?? []).length; i++) {
           await connection.query(
             "INSERT INTO experience_bullets (role_id, content, display_order) VALUES (?, ?, ?)",
             [roleId, role.bullets[i].content, i]
@@ -335,7 +325,6 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // ── Projects ───────────────────────────────────────────────────────────
     for (const project of projects) {
       const [projectResult] = await connection.query<ResultSetHeader>(
         "INSERT INTO projects (resume_id, name, url, display_order) VALUES (?, ?, ?, ?)",
@@ -343,7 +332,7 @@ router.post("/", async (req, res) => {
       );
       const projectId = String(projectResult.insertId);
 
-      for (let i = 0; i < (project.bullets || []).length; i++) {
+      for (let i = 0; i < (project.bullets ?? []).length; i++) {
         await connection.query(
           "INSERT INTO project_bullets (project_id, content, display_order) VALUES (?, ?, ?)",
           [projectId, project.bullets[i].content, i]
@@ -351,7 +340,6 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // ── Education ──────────────────────────────────────────────────────────
     for (const edu of education) {
       await connection.query(
         `INSERT INTO education 
@@ -381,4 +369,5 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
+
 export default router;

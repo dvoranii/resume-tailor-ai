@@ -14,6 +14,8 @@ import type {
   ExperienceBullet,
 } from "@resumeai/shared";
 
+import BulletRow from "../../UI/BulletRow";
+
 const uid = () => crypto.randomUUID();
 
 const newBullet = (): ExperienceBullet => ({
@@ -39,33 +41,6 @@ const newCompany = (): ExperienceCompany => ({
   roles: [newRole()],
   displayOrder: 0,
 });
-
-interface BulletRowProps {
-  bullet: ExperienceBullet;
-  onChange: (value: string) => void;
-  onDelete: () => void;
-}
-
-function BulletRow({ bullet, onChange, onDelete }: BulletRowProps) {
-  return (
-    <div className="flex items-start gap-2">
-      <GripVertical size={15} className="text-text-muted mt-2.5 shrink-0" />
-      <input
-        type="text"
-        value={bullet.content}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Describe an achievement or responsibility..."
-        className="flex-1 bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
-      />
-      <button
-        onClick={onDelete}
-        className="text-text-muted hover:text-red-400 transition-colors mt-2"
-      >
-        <Trash2 size={15} />
-      </button>
-    </div>
-  );
-}
 
 interface RoleCardProps {
   role: ExperienceRole;
@@ -171,7 +146,7 @@ function RoleCard({ role, onChange, onDelete }: RoleCardProps) {
             {role.bullets.map((bullet, i) => (
               <BulletRow
                 key={bullet.id}
-                bullet={bullet}
+                content={bullet.content}
                 onChange={(value) => updateBullet(i, value)}
                 onDelete={() => deleteBullet(i)}
               />

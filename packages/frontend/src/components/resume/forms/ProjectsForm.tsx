@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useResumeBuilder } from "../../../context/ResumeBuilderContext";
 import type { Project, ProjectBullet } from "@resumeai/shared";
+import BulletRow from "../../UI/BulletRow";
 
 const uid = () => crypto.randomUUID();
 
@@ -24,33 +25,6 @@ const newProject = (): Project => ({
   bullets: [newBullet()],
   displayOrder: 0,
 });
-
-interface BulletRowProps {
-  bullet: ProjectBullet;
-  onChange: (value: string) => void;
-  onDelete: () => void;
-}
-
-function BulletRow({ bullet, onChange, onDelete }: BulletRowProps) {
-  return (
-    <div className="flex items-start gap-2">
-      <GripVertical size={15} className="text-text-muted mt-2.5 shrink-0" />
-      <input
-        type="text"
-        value={bullet.content}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Describe a feature, tech choice, or outcome..."
-        className="flex-1 bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
-      />
-      <button
-        onClick={onDelete}
-        className="text-text-muted hover:text-red-400 transition-colors mt-2"
-      >
-        <Trash2 size={15} />
-      </button>
-    </div>
-  );
-}
 
 interface ProjectCardProps {
   project: Project;
@@ -145,9 +119,10 @@ function ProjectCard({ project, onChange, onDelete }: ProjectCardProps) {
             {project.bullets.map((bullet, i) => (
               <BulletRow
                 key={bullet.id}
-                bullet={bullet}
+                content={bullet.content}
                 onChange={(value) => updateBullet(i, value)}
                 onDelete={() => deleteBullet(i)}
+                placeholder="Describe a feature, tech choice, or outcome..."
               />
             ))}
             <button

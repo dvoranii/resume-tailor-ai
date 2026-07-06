@@ -19,7 +19,7 @@ export const SkillCategorySchema = z.object({
 });
 
 export const ExperienceBulletSchema = z.object({
-  id: z.string().default(""),
+  id: z.coerce.string().default(""),
   content: z.string().default(""),
   displayOrder: z.number().int().default(0),
 });
@@ -95,6 +95,23 @@ export type Project = z.infer<typeof ProjectSchema>;
 export type Education = z.infer<typeof EducationSchema>;
 export type Resume = z.infer<typeof ResumeSchema>;
 
+export const PersonalInfoSaveSchema = PersonalInfoSchema.extend({
+  email: z.string().default(""),
+});
+
+export const ResumeSaveSchema = ResumeSchema.extend({
+  personal: PersonalInfoSaveSchema.default({
+    name: "",
+    title: "",
+    email: "",
+    phone: "",
+    location: "",
+    linkedin: "",
+    github: "",
+    portfolio: "",
+  }),
+});
+
 export const TailoredResumeSchema = z.object({
   summary: z.string().optional(),
   skills: z.array(SkillCategorySchema).optional(),
@@ -103,3 +120,40 @@ export const TailoredResumeSchema = z.object({
 });
 
 export type TailoredResume = z.infer<typeof TailoredResumeSchema>;
+
+export const SectionIdSchema = z.enum([
+  "summary",
+  "experience",
+  "education",
+  "skills",
+  "projects",
+]);
+
+export const TemplateConfigSchema = z.object({
+  sectionOrder: z
+    .array(SectionIdSchema)
+    .default(["summary", "experience", "education", "skills", "projects"]),
+  sectionTitleColor: z.string().default("#1155cc"),
+  nameAlignment: z.enum(["left", "center"]).default("left"),
+  titleAlignment: z.enum(["left", "center"]).default("left"),
+  summaryAlignment: z.enum(["left", "center"]).default("left"),
+  contactAlignment: z.enum(["left", "center"]).default("left"),
+  experienceOrder: z.array(z.string()).default([]),
+  educationOrder: z.array(z.string()).default([]),
+  projectsOrder: z.array(z.string()).default([]),
+});
+
+export type SectionId = z.infer<typeof SectionIdSchema>;
+export type TemplateConfig = z.infer<typeof TemplateConfigSchema>;
+
+export const defaultTemplateConfig: TemplateConfig = {
+  sectionOrder: ["summary", "experience", "education", "skills", "projects"],
+  sectionTitleColor: "#1155cc",
+  nameAlignment: "left",
+  titleAlignment: "left",
+  summaryAlignment: "left",
+  contactAlignment: "left",
+  experienceOrder: [],
+  educationOrder: [],
+  projectsOrder: [],
+};

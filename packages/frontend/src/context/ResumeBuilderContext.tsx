@@ -1,7 +1,20 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import type { Resume } from "@resumeai/shared";
+import type { Resume, TemplateConfig } from "@resumeai/shared";
 
 const API_BASE = "http://localhost:3001/api/v1";
+
+// Define the config directly in the frontend
+const defaultTemplateConfig: TemplateConfig = {
+  sectionOrder: ["summary", "experience", "education", "skills", "projects"],
+  sectionTitleColor: "#1155cc",
+  nameAlignment: "left",
+  titleAlignment: "left",
+  summaryAlignment: "left",
+  experienceOrder: [],
+  educationOrder: [],
+  projectsOrder: [],
+  contactAlignment: "left",
+};
 
 const defaultResume: Resume = {
   personal: {
@@ -30,7 +43,11 @@ interface ResumeBuilderContextType {
   updateExperience: (experience: Resume["experience"]) => void;
   updateProjects: (projects: Resume["projects"]) => void;
   updateEducation: (education: Resume["education"]) => void;
-  saveResume: () => Promise<void>;
+  saveResume: (resume: Resume) => Promise<void>;
+  exportPdf: () => Promise<void>;
+  templateConfig: TemplateConfig;
+  updateTemplateConfig: (config: TemplateConfig) => void;
+  saveTemplateConfig: () => Promise<void>;
 }
 
 const ResumeBuilderContext = createContext<ResumeBuilderContextType | null>(
@@ -45,8 +62,13 @@ export function ResumeBuilderProvider({
   const [resume, setResume] = useState<Resume>(defaultResume);
   const [isLoading, setIsLoading] = useState(true);
   const [saveTimeout, setSaveTimeout] = useState<number | null>(null);
+  const [configSaveTimeout, setConfigSaveTimeout] = useState<number | null>(
+    null
+  );
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig>(
+    defaultTemplateConfig
+  );
 
-  // Load resume on mount
   useEffect(() => {
     const fetchResume = async () => {
       try {
@@ -66,13 +88,27 @@ export function ResumeBuilderProvider({
     fetchResume();
   }, []);
 
-  // Save resume to backend
-  const saveResume = async () => {
+  useEffect(() => {
+    const fetchTemplateConfig = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/template-config`);
+        if (response.ok) {
+          const data = await response.json();
+          setTemplateConfig(data);
+        }
+      } catch (error) {
+        console.error("Error fetching template config:", error);
+      }
+    };
+    fetchTemplateConfig();
+  }, []);
+
+  const saveResume = async (latestResume: Resume) => {
     try {
       const response = await fetch(`${API_BASE}/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(resume),
+        body: JSON.stringify(latestResume),
       });
       if (!response.ok) {
         console.error("Failed to save resume:", response.status);
@@ -82,44 +118,94 @@ export function ResumeBuilderProvider({
     }
   };
 
-  // Auto-save with debounce using browser timeout
-  const debouncedSave = () => {
+  const debouncedSave = (latestResume: Resume) => {
     if (saveTimeout) clearTimeout(saveTimeout);
     const timeout = window.setTimeout(() => {
-      saveResume();
+      saveResume(latestResume);
     }, 800);
     setSaveTimeout(timeout);
   };
 
-  // Update functions with auto-save
   const updatePersonal = (data: Resume["personal"]) => {
-    setResume((prev) => ({ ...prev, personal: data }));
-    debouncedSave();
+    const updated = { ...resume, personal: data };
+    setResume(updated);
+    debouncedSave(updated);
   };
 
   const updateSummary = (summary: string) => {
-    setResume((prev) => ({ ...prev, summary }));
-    debouncedSave();
+    const updated = { ...resume, summary };
+    setResume(updated);
+    debouncedSave(updated);
   };
 
   const updateSkills = (skills: Resume["skills"]) => {
-    setResume((prev) => ({ ...prev, skills }));
-    debouncedSave();
+    const updated = { ...resume, skills };
+    setResume(updated);
+    debouncedSave(updated);
   };
 
   const updateExperience = (experience: Resume["experience"]) => {
-    setResume((prev) => ({ ...prev, experience }));
-    debouncedSave();
+    const updated = { ...resume, experience };
+    setResume(updated);
+    debouncedSave(updated);
   };
 
   const updateProjects = (projects: Resume["projects"]) => {
-    setResume((prev) => ({ ...prev, projects }));
-    debouncedSave();
+    const updated = { ...resume, projects };
+    setResume(updated);
+    debouncedSave(updated);
   };
 
   const updateEducation = (education: Resume["education"]) => {
-    setResume((prev) => ({ ...prev, education }));
-    debouncedSave();
+    const updated = { ...resume, education };
+    setResume(updated);
+    debouncedSave(updated);
+  };
+
+  const exportPdf = async () => {
+    const response = await fetch(`${API_BASE}/export/pdf`, { method: "POST" });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Export failed");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resume.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const saveTemplateConfigToServer = async (latestConfig: TemplateConfig) => {
+    try {
+      const response = await fetch(`${API_BASE}/template-config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(latestConfig),
+      });
+      if (!response.ok) {
+        console.error("Failed to save template config:", response.status);
+      }
+    } catch (error) {
+      console.error("Error saving template config:", error);
+    }
+  };
+
+  const debouncedSaveTemplateConfig = (latestConfig: TemplateConfig) => {
+    if (configSaveTimeout) clearTimeout(configSaveTimeout);
+    const timeout = window.setTimeout(() => {
+      saveTemplateConfigToServer(latestConfig);
+    }, 800);
+    setConfigSaveTimeout(timeout);
+  };
+
+  const updateTemplateConfig = (config: TemplateConfig) => {
+    setTemplateConfig(config);
+    debouncedSaveTemplateConfig(config);
+  };
+
+  const saveTemplateConfig = async () => {
+    await saveTemplateConfigToServer(templateConfig);
   };
 
   return (
@@ -134,6 +220,10 @@ export function ResumeBuilderProvider({
         updateProjects,
         updateEducation,
         saveResume,
+        exportPdf,
+        templateConfig,
+        updateTemplateConfig,
+        saveTemplateConfig,
       }}
     >
       {children}

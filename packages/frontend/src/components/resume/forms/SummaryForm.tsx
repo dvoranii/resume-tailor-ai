@@ -28,10 +28,10 @@ export default function SummaryForm() {
         <div className="flex justify-end">
           <span
             className={`text-xs ${
-              resume.summary.length > 300 ? "text-red-400" : "text-text-muted"
+              resume.summary.length > 600 ? "text-red-400" : "text-text-muted"
             }`}
           >
-            {resume.summary.length} / 300
+            {resume.summary.length} / 600
           </span>
         </div>
       </div>

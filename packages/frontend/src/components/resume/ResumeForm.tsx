@@ -5,6 +5,7 @@ import ExperienceForm from "./forms/ExperienceForm";
 import EducationForm from "./forms/EducationForm";
 import SkillsForm from "./forms/SkillsForm";
 import ProjectsForm from "./forms/ProjectsForm";
+import TailorForm from "./forms/TailorForm";
 
 const tabs = [
   { id: "personal", label: "Personal Info" },
@@ -13,6 +14,7 @@ const tabs = [
   { id: "education", label: "Education" },
   { id: "skills", label: "Skills" },
   { id: "projects", label: "Projects" },
+  { id: "tailor", label: "✦ Tailor" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -34,17 +36,19 @@ export default function ResumeForm() {
         return <SkillsForm />;
       case "projects":
         return <ProjectsForm />;
+      case "tailor":
+        return <TailorForm />;
     }
   };
 
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
-      <div className="flex border-b border-border overflow-x-auto shrink-0">
+      <div className="flex border-b border-border overflow-x-auto shrink-0 justify-evenly">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+            className={`px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
               activeTab === tab.id
                 ? "border-accent text-accent"
                 : "border-transparent text-text-muted hover:text-text-primary"
