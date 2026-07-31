@@ -163,7 +163,11 @@ export function ResumeBuilderProvider({
   };
 
   const exportPdf = async () => {
-    const response = await fetch(`${API_BASE}/export/pdf`, { method: "POST" });
+    const response = await fetch(`${API_BASE}/export/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateConfig }),
+    });
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.error || "Export failed");

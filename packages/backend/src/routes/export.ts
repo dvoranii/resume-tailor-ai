@@ -7,10 +7,12 @@ import { ZodError, ZodIssue } from "zod";
 
 const router = Router();
 
-router.post("/pdf", async (_req, res) => {
+router.post("/pdf", async (req, res) => {
   const connection = await pool.getConnection();
 
   try {
+    const { templateConfig } = req.body;
+
     const [resumeRows] = await connection.query<RowDataPacket[]>(
       "SELECT id, summary FROM resumes LIMIT 1"
     );
@@ -148,7 +150,7 @@ router.post("/pdf", async (_req, res) => {
       return res.status(422).json({ error: "Resume is incomplete", details });
     }
 
-    const html = renderResumeToHtml(validated.data);
+    const html = renderResumeToHtml(validated.data, templateConfig);
     const pdf = await generatePdf(html);
 
     const name = personal.name ? personal.name.replace(/\s+/g, "_") : "resume";

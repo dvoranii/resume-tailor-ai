@@ -1,7 +1,21 @@
-import type { Resume } from "@resumeai/shared";
+import type { Resume, TemplateConfig } from "@resumeai/shared";
 
-export function renderResumeToHtml(resume: Resume): string {
+export function renderResumeToHtml(
+  resume: Resume,
+  config?: TemplateConfig
+): string {
   const { personal, summary, experience, education, skills, projects } = resume;
+
+  const getAlignmentStyle = (alignment: "left" | "center" = "left") => {
+    return `text-align: ${alignment}; justify-content: ${
+      alignment === "center" ? "center" : "flex-start"
+    };`;
+  };
+
+  const nameAlign = config?.nameAlignment || "left";
+  const titleAlign = config?.titleAlignment || "left";
+  const summaryAlign = config?.summaryAlignment || "left";
+  const contactAlign = config?.contactAlignment || "left";
 
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return "";
@@ -211,18 +225,20 @@ export function renderResumeToHtml(resume: Resume): string {
     </head>
     <body>
       <div style="margin-bottom:6px">
-        <div style="font-size:24px;font-weight:700;line-height:1.2">${
-          personal.name || "Your Name"
-        }</div>
-        <div style="font-size:13px;color:#1155cc;font-weight:600;margin-top:2px">${
-          personal.title || "Your Title"
-        }</div>
+        <div style="font-size:24px;font-weight:700;line-height:1.2; ${getAlignmentStyle(
+          nameAlign
+        )}">${personal.name || "Your Name"}</div>
+        <div style="font-size:13px;color:#1155cc;font-weight:600;margin-top:2px; ${getAlignmentStyle(
+          titleAlign
+        )}">${personal.title || "Your Title"}</div>
       </div>
 
       ${
         contactItems.length > 0
           ? `
-        <div style="margin-bottom:4px;display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333">
+        <div style="margin-bottom:4px;display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333; ${getAlignmentStyle(
+          contactAlign
+        )}">
           ${contactItems
             .map(
               (item, i) => `
@@ -238,7 +254,9 @@ export function renderResumeToHtml(resume: Resume): string {
       ${
         socialItems.length > 0
           ? `
-        <div style="display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333;margin-bottom:10px">
+        <div style="display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333;margin-bottom:10px; ${getAlignmentStyle(
+          contactAlign
+        )}">
           ${socialItems
             .map(
               (item, i) => `
@@ -258,7 +276,10 @@ export function renderResumeToHtml(resume: Resume): string {
 
       ${
         summary
-          ? section("Summary", `<p style="line-height:1.5">${summary}</p>`)
+          ? section(
+              "Summary",
+              `<p style="line-height:1.5; text-align:${summaryAlign}">${summary}</p>`
+            )
           : ""
       }
       ${experience.length > 0 ? section("Experience", experienceHtml) : ""}
