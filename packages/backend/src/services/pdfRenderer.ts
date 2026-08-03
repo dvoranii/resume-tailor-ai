@@ -17,21 +17,31 @@ export function renderResumeToHtml(
   const summaryAlign = config?.summaryAlignment || "left";
   const contactAlign = config?.contactAlignment || "left";
 
+  const section = (title: string, content: string) => `
+  <div style="margin-bottom:10px">
+    <div style="font-size:10px;font-weight:700;color:#1155cc;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #1155cc;padding-bottom:2px;margin-bottom:6px">
+      ${title}
+    </div>
+    ${content}
+  </div>
+`;
+
+  // 2. Fallback or read the order sent over from templateConfig
+  const defaultOrder = [
+    "summary",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+  ];
+  const activeOrder = config?.sectionOrder || defaultOrder;
+
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return "";
     return url.startsWith("http://") || url.startsWith("https://")
       ? url
       : `https://${url}`;
   };
-
-  const section = (title: string, content: string) => `
-    <div style="margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:#1155cc;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #1155cc;padding-bottom:2px;margin-bottom:6px">
-        ${title}
-      </div>
-      ${content}
-    </div>
-  `;
 
   const contactItems: string[] = [];
   if (personal.email) contactItems.push(`✉ ${personal.email}`);
@@ -195,6 +205,25 @@ export function renderResumeToHtml(
           .join("")
       : "";
 
+  const sectionRenderers: Record<string, string> = {
+    summary: summary
+      ? section(
+          "Summary",
+          `<p style="line-height:1.5; text-align:${summaryAlign}">${summary}</p>`
+        )
+      : "",
+    experience:
+      experience.length > 0 ? section("Experience", experienceHtml) : "",
+    education: education.length > 0 ? section("Education", educationHtml) : "",
+    skills: skills.length > 0 ? section("Skills", skillsHtml) : "",
+    projects: projects.length > 0 ? section("Projects", projectsHtml) : "",
+  };
+
+  // 3. Generate the sections dynamically in the exact user-defined order
+  const dynamicSectionsHtml = activeOrder
+    .map((key) => sectionRenderers[key] || "")
+    .join("");
+
   return `
     <!DOCTYPE html>
     <html>
@@ -282,10 +311,7 @@ export function renderResumeToHtml(
             )
           : ""
       }
-      ${experience.length > 0 ? section("Experience", experienceHtml) : ""}
-      ${education.length > 0 ? section("Education", educationHtml) : ""}
-      ${skills.length > 0 ? section("Skills", skillsHtml) : ""}
-      ${projects.length > 0 ? section("Projects", projectsHtml) : ""}
+      ${dynamicSectionsHtml}
     </body>
     </html>
   `;
