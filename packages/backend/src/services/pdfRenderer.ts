@@ -242,10 +242,7 @@ export function renderResumeToHtml(
           padding: 43px 48px;
           margin: 0 auto;
         }
-        @page {
-          margin: 0;
-          size: 816px 1056px;
-        }
+        @page { margin: 0; size: 816px 1056px; }
         @media print {
           body { margin: 0; padding: 43px 48px; }
           .page-break { page-break-before: always; }
@@ -261,60 +258,37 @@ export function renderResumeToHtml(
           titleAlign
         )}">${personal.title || "Your Title"}</div>
       </div>
-
+    
       ${
         contactItems.length > 0
           ? `
-        <div style="margin-bottom:4px;display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333; ${getAlignmentStyle(
+        <div style="margin-bottom:4px;display:flex;flex-wrap:wrap;font-size:9.5px;color:#333; ${getAlignmentStyle(
           contactAlign
         )}">
           ${contactItems
-            .map(
-              (item, i) => `
-            ${i > 0 ? `<span style="color:#aaa">|</span>` : ""}
-            <span>${item}</span>
-          `
-            )
-            .join("")}
+            .map((item) => `<span>${item}</span>`)
+            .join('<span style="color:#aaa;margin:0 4px;">|</span>')}
         </div>
       `
           : ""
       }
+    
       ${
         socialItems.length > 0
           ? `
-        <div style="display:flex;flex-wrap:wrap;gap:0 6px;font-size:9.5px;color:#333;margin-bottom:10px; ${getAlignmentStyle(
+        <div style="display:flex;flex-wrap:wrap;font-size:9.5px;color:#333;margin-bottom:10px; ${getAlignmentStyle(
           contactAlign
         )}">
-          ${socialItems
-            .map(
-              (item, i) => `
-            ${
-              i > 0
-                ? `<span style="color:#aaa;padding-left:2px;padding-right:2px;">|</span>`
-                : ""
-            }
-            <span style="display:inline-flex;align-items:center;">${item}</span>
-          `
-            )
-            .join("")}
+          ${socialItems.join('<span style="color:#aaa;margin:0 4px;">|</span>')}
         </div>
       `
           : `<div style="margin-bottom:10px"></div>`
       }
-
-      ${
-        summary
-          ? section(
-              "Summary",
-              `<p style="line-height:1.5; text-align:${summaryAlign}">${summary}</p>`
-            )
-          : ""
-      }
+    
       ${dynamicSectionsHtml}
     </body>
     </html>
-  `;
+    `;
 }
 
 export async function generatePdf(html: string): Promise<Buffer> {
