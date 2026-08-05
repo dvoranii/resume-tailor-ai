@@ -3,6 +3,7 @@ import type { SectionId } from "@resumeai/shared";
 import { Mail, Phone, MapPin, Globe } from "lucide-react";
 import linkedinIcon from "../../assets/linked-icon.svg";
 import githubIcon from "../../assets/github-icon.svg";
+import type { ExperienceCompany, Education, Project } from "@resumeai/shared";
 
 export default function ResumePreview() {
   const { resume, templateConfig } = useResumeBuilder();
@@ -19,9 +20,12 @@ export default function ResumePreview() {
     projectsOrder,
   } = templateConfig;
 
-  const orderedExperience = applyOrder(experience, experienceOrder);
-  const orderedEducation = applyOrder(education, educationOrder);
-  const orderedProjects = applyOrder(projects, projectsOrder);
+  const orderedExperience = applyOrder(
+    experience,
+    experienceOrder
+  ) as ExperienceCompany[];
+  const orderedEducation = applyOrder(education, educationOrder) as Education[];
+  const orderedProjects = applyOrder(projects, projectsOrder) as Project[];
 
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return "";
@@ -358,18 +362,27 @@ export default function ResumePreview() {
   );
 }
 
-function applyOrder<T extends { id: string; displayOrder: number }>(
-  items: T[],
-  order: string[]
-): T[] {
+function applyOrder<T>(items: T[], order: string[]): T[] {
   if (order.length === 0) {
-    return [...items].sort((a, b) => a.displayOrder - b.displayOrder);
+    return [...items].sort((a, b) => {
+      const aOrder = (a as any).displayOrder ?? 0;
+      const bOrder = (b as any).displayOrder ?? 0;
+      return aOrder - bOrder;
+    });
   }
-  const byId = new Map(items.map((item) => [item.id, item]));
+
+  const byId = new Map(
+    items.map((item) => {
+      const id = (item as any).id;
+      return [id, item];
+    })
+  );
+
   const ordered = order
     .map((id) => byId.get(id))
     .filter((item): item is T => item !== undefined);
-  const remaining = items.filter((item) => !order.includes(item.id));
+
+  const remaining = items.filter((item) => !order.includes((item as any).id));
   return [...ordered, ...remaining];
 }
 

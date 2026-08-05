@@ -12,10 +12,14 @@ export function renderResumeToHtml(
     };`;
   };
 
-  const nameAlign = config?.nameAlignment || "left";
-  const titleAlign = config?.titleAlignment || "left";
-  const summaryAlign = config?.summaryAlignment || "left";
-  const contactAlign = config?.contactAlignment || "left";
+  const nameAlign = (config?.nameAlignment || "left") as "left" | "center";
+  const titleAlign = (config?.titleAlignment || "left") as "left" | "center";
+  const summaryAlign = (config?.summaryAlignment || "left") as
+    | "left"
+    | "center";
+  const contactAlign = (config?.contactAlignment || "left") as
+    | "left"
+    | "center";
 
   const section = (title: string, content: string) => `
   <div style="margin-bottom:10px">
@@ -26,7 +30,6 @@ export function renderResumeToHtml(
   </div>
 `;
 
-  // 2. Fallback or read the order sent over from templateConfig
   const defaultOrder = [
     "summary",
     "experience",
@@ -34,7 +37,6 @@ export function renderResumeToHtml(
     "skills",
     "projects",
   ];
-  const activeOrder = config?.sectionOrder || defaultOrder;
 
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return "";
@@ -219,9 +221,12 @@ export function renderResumeToHtml(
     projects: projects.length > 0 ? section("Projects", projectsHtml) : "",
   };
 
+  const activeOrder: string[] = (config?.sectionOrder ||
+    Object.keys(sectionRenderers)) as string[];
+
   // 3. Generate the sections dynamically in the exact user-defined order
   const dynamicSectionsHtml = activeOrder
-    .map((key) => sectionRenderers[key] || "")
+    .map((key: string) => sectionRenderers[key] || "")
     .join("");
 
   return `

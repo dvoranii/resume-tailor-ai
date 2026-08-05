@@ -6,6 +6,9 @@ import exportRouter from "./routes/export";
 import tailorRouter from "./routes/tailor";
 import jobsRouter from "./routes/jobs";
 import templateConfigRouter from "./routes/templateConfig";
+import apiKeysRoutes from "./routes/apiKeys";
+import testApifyRoutes from "./routes/testApify";
+import collectionsRoutes from "./routes/collections";
 
 dotenv.config();
 
@@ -30,6 +33,9 @@ app.use("/api/v1/export", exportRouter);
 app.use("/api/v1/tailor", tailorRouter);
 app.use("/api/v1/jobs", jobsRouter);
 app.use("/api/v1/template-config", templateConfigRouter);
+app.use("/api/v1/api-keys", apiKeysRoutes);
+app.use("/api/v1/test-apify", testApifyRoutes);
+app.use("/api/v1/collections", collectionsRoutes);
 
 // Health check
 app.get("/api/v1/health", (_req, res) => {
