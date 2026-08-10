@@ -1,9 +1,13 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import type { Resume, TemplateConfig } from "@resumeai/shared";
+import { API_BASE } from "../types/jobs";
 
-const API_BASE = "http://localhost:3001/api/v1";
-
-// Define the config directly in the frontend
 const defaultTemplateConfig: TemplateConfig = {
   sectionOrder: ["summary", "experience", "education", "skills", "projects"],
   sectionTitleColor: "#1155cc",
@@ -37,6 +41,7 @@ const defaultResume: Resume = {
 interface ResumeBuilderContextType {
   resume: Resume;
   isLoading: boolean;
+  resumeName: string;
   updatePersonal: (data: Resume["personal"]) => void;
   updateSummary: (summary: string) => void;
   updateSkills: (skills: Resume["skills"]) => void;
@@ -44,6 +49,8 @@ interface ResumeBuilderContextType {
   updateProjects: (projects: Resume["projects"]) => void;
   updateEducation: (education: Resume["education"]) => void;
   saveResume: (resume: Resume) => Promise<void>;
+  loadResume: (id?: number | null) => Promise<void>;
+  saveAsNew: (name: string, isDefault: boolean) => Promise<void>;
   exportPdf: () => Promise<void>;
   templateConfig: TemplateConfig;
   updateTemplateConfig: (config: TemplateConfig) => void;
@@ -61,6 +68,8 @@ export function ResumeBuilderProvider({
 }) {
   const [resume, setResume] = useState<Resume>(defaultResume);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentResumeId, setCurrentResumeId] = useState<number | null>(null);
+  const [resumeName, setResumeName] = useState<string>("My Resume");
   const [saveTimeout, setSaveTimeout] = useState<number | null>(null);
   const [configSaveTimeout, setConfigSaveTimeout] = useState<number | null>(
     null
@@ -69,46 +78,115 @@ export function ResumeBuilderProvider({
     defaultTemplateConfig
   );
 
-  useEffect(() => {
-    const fetchResume = async () => {
+  const resetToEmpty = useCallback(() => {
+    setResume(defaultResume);
+    setCurrentResumeId(null);
+    setResumeName("Untitled");
+  }, []);
+
+  const fetchResumeData = useCallback(
+    async (id?: number | null) => {
+      setIsLoading(true);
       try {
-        const response = await fetch(`${API_BASE}/resume`);
-        if (response.ok) {
-          const data = await response.json();
-          setResume(data);
-        } else {
-          console.error("Failed to fetch resume:", response.status);
+        if (id === null) {
+          resetToEmpty();
+          return;
+        }
+        let url = `${API_BASE}/resume`;
+
+        if (id) {
+          url += `?id=${id}`;
+        }
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            resetToEmpty();
+            return;
+          }
+          throw new Error(`Failed to fetch resume: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setResume(data);
+        setCurrentResumeId(id || null);
+        setResumeName(data.name || "Untitled");
+
+        // Fetch name from list
+        const listRes = await fetch(`${API_BASE}/resumes/list`);
+        if (listRes.ok) {
+          const list = await listRes.json();
+          if (id) {
+            const found = list.find((r: any) => r.id === id);
+            if (found) setResumeName(found.name);
+          } else {
+            const defaultOne = list.find((r: any) => r.isDefault === true);
+            if (defaultOne) setResumeName(defaultOne.name);
+            else if (list.length > 0) setResumeName(list[0].name);
+          }
         }
       } catch (error) {
-        console.error("Error fetching resume:", error);
+        console.error("Error loading resume:", error);
+        resetToEmpty();
       } finally {
         setIsLoading(false);
       }
-    };
-    fetchResume();
-  }, []);
+    },
+    [resetToEmpty]
+  );
 
-  useEffect(() => {
-    const fetchTemplateConfig = async () => {
+  const loadResume = useCallback(
+    async (id?: number | null) => {
+      await fetchResumeData(id);
+    },
+    [fetchResumeData]
+  );
+
+  const saveAsNew = useCallback(
+    async (name: string, isDefault: boolean) => {
       try {
-        const response = await fetch(`${API_BASE}/template-config`);
-        if (response.ok) {
-          const data = await response.json();
-          setTemplateConfig(data);
-        }
+        const payload = {
+          ...resume,
+          name,
+          isDefault,
+          // Omit resumeId so the backend creates a new record
+        };
+        const response = await fetch(`${API_BASE}/resume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error("Failed to save as new");
+        const data = await response.json();
+        // Redirect to the newly created resume
+        window.location.href = `/resume?id=${data.id}`;
       } catch (error) {
-        console.error("Error fetching template config:", error);
+        console.error("Error saving as new:", error);
+        alert("Failed to save as new resume.");
       }
-    };
-    fetchTemplateConfig();
-  }, []);
+    },
+    [resume]
+  );
 
   const saveResume = async (latestResume: Resume) => {
+    if (currentResumeId === null) {
+      console.warn("Cannot save without a resume ID – use saveAsNew instead");
+      return;
+    }
+
     try {
+      const payload = {
+        ...latestResume,
+        resumeId: currentResumeId,
+        name: resumeName,
+        isDefault: false,
+      };
+
       const response = await fetch(`${API_BASE}/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(latestResume),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         console.error("Failed to save resume:", response.status);
@@ -180,6 +258,7 @@ export function ResumeBuilderProvider({
     a.click();
     URL.revokeObjectURL(url);
   };
+
   const saveTemplateConfigToServer = async (latestConfig: TemplateConfig) => {
     try {
       const response = await fetch(`${API_BASE}/template-config`, {
@@ -217,6 +296,7 @@ export function ResumeBuilderProvider({
       value={{
         resume,
         isLoading,
+        resumeName,
         updatePersonal,
         updateSummary,
         updateSkills,
@@ -224,6 +304,8 @@ export function ResumeBuilderProvider({
         updateProjects,
         updateEducation,
         saveResume,
+        loadResume,
+        saveAsNew,
         exportPdf,
         templateConfig,
         updateTemplateConfig,

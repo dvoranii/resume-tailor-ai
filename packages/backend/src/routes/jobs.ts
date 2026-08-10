@@ -4,27 +4,38 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  const { collectionId } = req.query;
+
+  let query = `SELECT 
+              id,
+              company_name AS companyName,
+              job_title AS jobTitle,
+              job_url AS jobUrl,
+              job_description AS jobDescription,
+              fit_score AS fitScore,
+              seniority_level AS seniorityLevel,
+              salary,
+              applicants_count AS applicantsCount,
+              posted_at AS postedAt,
+              suggested_focus AS suggestedFocus,
+              reasoning,
+              status,
+              variant_id AS variantId,
+              collection_id AS collectionId
+            FROM jobs`;
+
+  const params: (string | number)[] = [];
+
+  if (collectionId) {
+    query += ` WHERE collection_id = ?`;
+    params.push(collectionId as string);
+  }
+
+  query += ` ORDER BY created_at DESC`;
+
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT 
-        id,
-        company_name AS companyName,
-        job_title AS jobTitle,
-        job_url AS jobUrl,
-        job_description AS jobDescription,
-        fit_score AS fitScore,
-        seniority_level AS seniorityLevel,
-        salary,
-        applicants_count AS applicantsCount,
-        posted_at AS postedAt,
-        suggested_focus AS suggestedFocus,
-        reasoning,
-        status,
-        variant_id AS variantId
-      FROM jobs
-      ORDER BY created_at DESC`
-    );
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
     res.json(rows);
   } catch (error) {
     console.error("Error fetching jobs:", error);
