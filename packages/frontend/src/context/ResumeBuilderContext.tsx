@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  // useEffect,
-  useCallback,
-} from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import type { Resume, TemplateConfig } from "@resumeai/shared";
 import { API_BASE } from "../types/jobs";
 

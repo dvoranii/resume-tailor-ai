@@ -13,6 +13,7 @@ interface BaseResume {
   name: string;
   summary: string;
   isDefault: boolean;
+  isComplete: boolean;
   variantCount: number;
   createdAt: string;
   updatedAt: string;
@@ -101,11 +102,18 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between">
               <h3 className="text-text-primary font-medium">{resume.name}</h3>
-              {resume.isDefault && (
-                <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
-                  Default
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {resume.isComplete ? (
+                  <span className="text-xs text-green-400">✅ Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-400">⚠️ Incomplete</span>
+                )}
+                {resume.isDefault && (
+                  <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
+                    Default
+                  </span>
+                )}
+              </div>
             </div>
             <p className="text-text-muted text-sm mt-1 line-clamp-2">
               {resume.summary || "No summary"}

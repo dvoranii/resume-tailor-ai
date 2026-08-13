@@ -110,7 +110,7 @@ function RoleCard({ role, onChange, onDelete }: RoleCardProps) {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-text-muted">Employment Type</label>
               <select
-                value={role.employmentType}
+                value={role.employmentType as string}
                 onChange={(e) => setField("employmentType")(e.target.value)}
                 className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
               >
@@ -143,7 +143,7 @@ function RoleCard({ role, onChange, onDelete }: RoleCardProps) {
 
           <div className="flex flex-col gap-2">
             <label className="text-xs text-text-muted">Bullets</label>
-            {role.bullets.map((bullet, i) => (
+            {role.bullets.map((bullet: { id: string; content: string }, i) => (
               <BulletRow
                 key={bullet.id}
                 content={bullet.content}

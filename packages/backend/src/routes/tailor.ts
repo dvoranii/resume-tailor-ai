@@ -145,7 +145,7 @@ async function fetchMasterResume(
 }
 
 router.post("/", async (req, res) => {
-  const { jobDescription, jobTitle, companyName } = req.body;
+  const { jobDescription, jobTitle, companyName, jobId } = req.body;
 
   if (!jobDescription?.trim()) {
     return res.status(400).json({ error: "Job description is required" });
@@ -208,19 +208,66 @@ ${jobDescription}`;
         .json({ error: "AI response did not match resume schema", details });
     }
 
-    const [result] = await connection.query<ResultSetHeader>(
-      "INSERT INTO resume_variants (resume_id, job_title, company_name, job_description, tailored_data) VALUES (?, ?, ?, ?, ?)",
-      [
-        resumeId,
-        jobTitle || "",
-        companyName || "",
-        jobDescription,
-        JSON.stringify(validated.data),
-      ]
-    );
+    // ✅ Check if a variant already exists for this resume + job
+    let variantId: number;
+
+    if (jobId) {
+      const [existing] = await connection.query<RowDataPacket[]>(
+        `SELECT id FROM resume_variants WHERE resume_id = ? AND job_id = ?`,
+        [resumeId, jobId]
+      );
+
+      if (existing.length > 0) {
+        // ✅ Update existing variant
+        await connection.query(
+          `UPDATE resume_variants SET tailored_data = ? WHERE id = ?`,
+          [JSON.stringify(validated.data), existing[0].id]
+        );
+        variantId = existing[0].id;
+      } else {
+        // ✅ Insert new variant with job_id
+        const [result] = await connection.query<ResultSetHeader>(
+          `INSERT INTO resume_variants 
+            (resume_id, job_id, job_title, company_name, job_description, tailored_data)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            resumeId,
+            jobId,
+            jobTitle || "",
+            companyName || "",
+            jobDescription,
+            JSON.stringify(validated.data),
+          ]
+        );
+        variantId = result.insertId;
+      }
+    } else {
+      // ✅ No jobId provided – insert as standalone variant (job_id = NULL)
+      const [result] = await connection.query<ResultSetHeader>(
+        `INSERT INTO resume_variants 
+          (resume_id, job_title, company_name, job_description, tailored_data)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          resumeId,
+          jobTitle || "",
+          companyName || "",
+          jobDescription,
+          JSON.stringify(validated.data),
+        ]
+      );
+      variantId = result.insertId;
+    }
+
+    // ✅ Update the job's variant_id (if jobId is provided)
+    if (jobId) {
+      await connection.query(`UPDATE jobs SET variant_id = ? WHERE id = ?`, [
+        variantId,
+        jobId,
+      ]);
+    }
 
     res.json({
-      variantId: result.insertId,
+      variantId,
       original: resume,
       tailored: validated.data,
     });

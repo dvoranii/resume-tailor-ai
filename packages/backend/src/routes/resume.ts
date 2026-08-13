@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { ResumeSaveSchema } from "@resumeai/shared";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { ZodError, ZodIssue } from "zod";
+import { isResumeComplete } from "../services/resumeValidation";
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.get("/list", async (_req, res) => {
         r.name, 
         r.summary, 
         r.is_default AS isDefault,
+        r.is_complete AS isComplete, 
         r.created_at AS createdAt,
         r.updated_at AS updatedAt,
         COUNT(v.id) AS variantCount
@@ -444,6 +446,12 @@ router.post("/", async (req, res) => {
         ]
       );
     }
+
+    const complete = isResumeComplete(data);
+    await connection.query("UPDATE resumes SET is_complete = ? WHERE id = ?", [
+      complete,
+      resumeIdToUse,
+    ]);
 
     await connection.commit();
     res.status(201).json({ id: resumeIdToUse });

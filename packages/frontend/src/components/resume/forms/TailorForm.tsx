@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import type { Resume } from "@resumeai/shared";
+import { API_BASE } from "../../../types/jobs";
 
-const API_BASE = "http://localhost:3001/api/v1";
+// const API_BASE = "http://localhost:3001/api/v1";
 
 interface Job {
   id: number;
@@ -179,8 +180,10 @@ function DiffReview({
               >
                 <DiffColumnHeaders />
                 <DiffBullets
-                  original={origRole?.bullets.map((b) => b.content) ?? []}
-                  tailored={role.bullets.map((b) => b.content)}
+                  original={
+                    (origRole?.bullets.map((b) => b.content) as string[]) ?? []
+                  }
+                  tailored={role.bullets.map((b) => b.content) as string[]}
                 />
               </DiffSection>
             );
@@ -289,6 +292,7 @@ export default function TailorForm() {
           jobTitle: selectedJob.jobTitle,
           companyName: selectedJob.companyName,
           jobDescription,
+          jobId: selectedJob.id,
         }),
       });
 
