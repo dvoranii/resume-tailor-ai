@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  setActiveResumeId,
+  getActiveResumeId,
+  clearActiveResumeId,
+} from "../utils/activeResume";
+
 import { API_BASE } from "../types/jobs";
 
 interface BaseResume {
@@ -56,6 +62,8 @@ export default function Dashboard() {
       return;
     try {
       await fetch(`${API_BASE}/resume/${id}`, { method: "DELETE" });
+      const activeId = getActiveResumeId();
+      if (activeId === id) clearActiveResumeId();
       fetchResumes();
     } catch (error) {
       console.error("Failed to delete resume:", error);
@@ -110,7 +118,10 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={() => navigate(`/resume?id=${resume.id}`)}
+                onClick={() => {
+                  setActiveResumeId(resume.id);
+                  navigate(`/resume?id=${resume.id}`);
+                }}
                 className="text-accent hover:underline text-sm"
               >
                 Open

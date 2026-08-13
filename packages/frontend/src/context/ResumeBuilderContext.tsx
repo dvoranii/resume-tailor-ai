@@ -50,7 +50,7 @@ interface ResumeBuilderContextType {
   updateEducation: (education: Resume["education"]) => void;
   saveResume: (resume: Resume) => Promise<void>;
   loadResume: (id?: number | null) => Promise<void>;
-  saveAsNew: (name: string, isDefault: boolean) => Promise<void>;
+  saveAsNew: (name: string, isDefault: boolean) => Promise<number>;
   exportPdf: () => Promise<void>;
   templateConfig: TemplateConfig;
   updateTemplateConfig: (config: TemplateConfig) => void;
@@ -144,26 +144,28 @@ export function ResumeBuilderProvider({
   );
 
   const saveAsNew = useCallback(
-    async (name: string, isDefault: boolean) => {
+    async (name: string, isDefault: boolean): Promise<number> => {
       try {
         const payload = {
           ...resume,
           name,
           isDefault,
-          // Omit resumeId so the backend creates a new record
         };
         const response = await fetch(`${API_BASE}/resume`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error("Failed to save as new");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to save as new");
+        }
         const data = await response.json();
-        // Redirect to the newly created resume
-        window.location.href = `/resume?id=${data.id}`;
+        return data.id;
       } catch (error) {
         console.error("Error saving as new:", error);
         alert("Failed to save as new resume.");
+        throw error;
       }
     },
     [resume]

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Download } from "lucide-react";
 import {
   ResumeBuilderProvider,
@@ -8,6 +8,12 @@ import {
 import ResumeForm from "../components/resume/ResumeForm";
 import ResumePreview from "../components/resume/ResumePreview";
 import TemplateConfigPanel from "../components/resume/TemplateConfigPanel";
+
+import {
+  clearActiveResumeId,
+  getActiveResumeId,
+  setActiveResumeId,
+} from "../utils/activeResume";
 
 function ResumeBuilderContent() {
   const { exportPdf, resume, isLoading, loadResume, saveAsNew, resumeName } =
@@ -18,15 +24,27 @@ function ResumeBuilderContent() {
   const resumeId = searchParams.get("id");
   const isNew = searchParams.get("new") === "true";
 
+  const navigate = useNavigate();
+
   useEffect(() => {
     if (isNew) {
       loadResume(null);
+      clearActiveResumeId();
     } else if (resumeId) {
       loadResume(Number(resumeId));
+      setActiveResumeId(Number(resumeId));
     } else {
-      loadResume();
+      // No ID in URL – check localStorage
+      const activeId = getActiveResumeId();
+      if (activeId) {
+        // Redirect to the active resume
+        navigate(`/resume?id=${activeId}`);
+      } else {
+        // Fallback to default
+        loadResume();
+      }
     }
-  }, [resumeId, isNew, loadResume]);
+  }, [resumeId, isNew, loadResume, navigate]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -44,7 +62,13 @@ function ResumeBuilderContent() {
     const name = prompt("Enter a name for this base resume: ", "My Resume");
     if (name === null) return;
     const isDefault = confirm("Set as default?");
-    await saveAsNew(name, isDefault);
+    try {
+      const newId = await saveAsNew(name, isDefault);
+      setActiveResumeId(newId);
+      navigate(`/resume?id=${newId}`);
+    } catch (error) {
+      console.error("Save as new failed:", error);
+    }
   };
 
   return (
