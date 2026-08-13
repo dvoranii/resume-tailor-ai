@@ -2,7 +2,7 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
+  // useEffect,
   useCallback,
 } from "react";
 import type { Resume, TemplateConfig } from "@resumeai/shared";
@@ -190,6 +190,7 @@ export function ResumeBuilderProvider({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       if (!response.ok) {
         console.error("Failed to save resume:", response.status);
       }
@@ -206,41 +207,23 @@ export function ResumeBuilderProvider({
     setSaveTimeout(timeout);
   };
 
-  const updatePersonal = (data: Resume["personal"]) => {
-    const updated = { ...resume, personal: data };
+  const updateField = <K extends keyof Resume>(field: K, value: Resume[K]) => {
+    const updated = { ...resume, [field]: value };
     setResume(updated);
     debouncedSave(updated);
   };
 
-  const updateSummary = (summary: string) => {
-    const updated = { ...resume, summary };
-    setResume(updated);
-    debouncedSave(updated);
-  };
-
-  const updateSkills = (skills: Resume["skills"]) => {
-    const updated = { ...resume, skills };
-    setResume(updated);
-    debouncedSave(updated);
-  };
-
-  const updateExperience = (experience: Resume["experience"]) => {
-    const updated = { ...resume, experience };
-    setResume(updated);
-    debouncedSave(updated);
-  };
-
-  const updateProjects = (projects: Resume["projects"]) => {
-    const updated = { ...resume, projects };
-    setResume(updated);
-    debouncedSave(updated);
-  };
-
-  const updateEducation = (education: Resume["education"]) => {
-    const updated = { ...resume, education };
-    setResume(updated);
-    debouncedSave(updated);
-  };
+  const updatePersonal = (data: Resume["personal"]) =>
+    updateField("personal", data);
+  const updateSummary = (summary: string) => updateField("summary", summary);
+  const updateSkills = (skills: Resume["skills"]) =>
+    updateField("skills", skills);
+  const updateExperience = (experience: Resume["experience"]) =>
+    updateField("experience", experience);
+  const updateProjects = (projects: Resume["projects"]) =>
+    updateField("projects", projects);
+  const updateEducation = (education: Resume["education"]) =>
+    updateField("education", education);
 
   const exportPdf = async () => {
     const response = await fetch(`${API_BASE}/export/pdf`, {
