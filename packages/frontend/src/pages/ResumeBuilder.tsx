@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, ArrowLeft } from "lucide-react";
 import {
   ResumeBuilderProvider,
   useResumeBuilder,
@@ -13,15 +13,30 @@ import {
   clearActiveResumeId,
   getActiveResumeId,
   setActiveResumeId,
+  getActiveVariantId,
+  setActiveVariantId,
+  clearActiveVariantId,
+  clearActiveState,
 } from "../utils/activeResume";
 
 function ResumeBuilderContent() {
-  const { exportPdf, resume, isLoading, loadResume, saveAsNew, resumeName } =
-    useResumeBuilder();
+  const {
+    exportPdf,
+    // resume,
+    isLoading,
+    loadResume,
+    loadVariant,
+    saveAsNew,
+    resumeName,
+    isVariant,
+    variantJobTitle,
+    variantCompany,
+  } = useResumeBuilder();
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const resumeId = searchParams.get("id");
+  const variantId = searchParams.get("variantId");
   const isNew = searchParams.get("new") === "true";
 
   const navigate = useNavigate();
@@ -29,22 +44,31 @@ function ResumeBuilderContent() {
   useEffect(() => {
     if (isNew) {
       loadResume(null);
+      clearActiveState(); // clear both
+    } else if (variantId) {
+      loadVariant(Number(variantId));
+      setActiveVariantId(Number(variantId));
       clearActiveResumeId();
     } else if (resumeId) {
       loadResume(Number(resumeId));
       setActiveResumeId(Number(resumeId));
+      clearActiveVariantId();
     } else {
       // No ID in URL – check localStorage
-      const activeId = getActiveResumeId();
-      if (activeId) {
-        // Redirect to the active resume
-        navigate(`/resume?id=${activeId}`);
-      } else {
-        // Fallback to default
-        loadResume();
+      const activeVariant = getActiveVariantId();
+      if (activeVariant) {
+        navigate(`/resume?variantId=${activeVariant}`);
+        return;
       }
+      const activeResume = getActiveResumeId();
+      if (activeResume) {
+        navigate(`/resume?id=${activeResume}`);
+        return;
+      }
+      // Fallback to default
+      loadResume();
     }
-  }, [resumeId, isNew, loadResume, navigate]);
+  }, [resumeId, variantId, isNew, loadResume, loadVariant, navigate]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -65,11 +89,21 @@ function ResumeBuilderContent() {
     try {
       const newId = await saveAsNew(name, isDefault);
       setActiveResumeId(newId);
+      clearActiveVariantId();
       navigate(`/resume?id=${newId}`);
     } catch (error) {
       console.error("Save as new failed:", error);
     }
   };
+
+  const handleBackToVariants = () => {
+    clearActiveVariantId();
+    navigate(-1);
+  };
+
+  const headerTitle = isVariant
+    ? `Variant: ${variantJobTitle} at ${variantCompany}`
+    : resumeName || "Untitled";
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -78,11 +112,21 @@ function ResumeBuilderContent() {
           <span>Resume Builder</span>
           <span>/</span>
           <span className="text-text-primary">
-            {isLoading ? "Loading..." : resumeName || "Untitled"}
+            {isLoading ? "Loading..." : headerTitle}
           </span>
         </div>
         <div className="flex items-center gap-3">
           {error && <span className="text-red-400 text-xs">{error}</span>}
+
+          {isVariant && (
+            <button
+              onClick={() => handleBackToVariants()}
+              className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm px-3 py-2 rounded-md transition-colors"
+            >
+              <ArrowLeft size={15} />
+              Back to Variants
+            </button>
+          )}
 
           <button
             onClick={handleSaveAsNew}

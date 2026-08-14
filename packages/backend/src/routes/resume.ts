@@ -501,4 +501,67 @@ router.patch("/:id/default", async (req, res) => {
   }
 });
 
+router.get("/variants/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 
+        id,
+        job_id AS jobId,
+        job_title AS jobTitle,
+        company_name AS companyName,
+        job_description AS jobDescription,
+        tailored_data AS tailoredData,
+        created_at AS createdAt
+      FROM resume_variants
+      WHERE id = ?`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Variant not found" });
+    }
+    const variant = rows[0];
+    res.json({
+      id: variant.id,
+      jobId: variant.jobId,
+      jobTitle: variant.jobTitle,
+      companyName: variant.companyName,
+      jobDescription: variant.jobDescription,
+      tailoredData:
+        typeof variant.tailoredData === "string"
+          ? JSON.parse(variant.tailoredData)
+          : variant.tailoredData,
+      createdAt: variant.createdAt,
+    });
+  } catch (error) {
+    console.error("Error fetching variant:", error);
+    res.status(500).json({ error: "Failed to fetch variant" });
+  }
+});
+
+router.get("/:resumeId/variants", async (req, res) => {
+  const { resumeId } = req.params;
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 
+        rv.id,
+        rv.job_id AS jobId,
+        rv.job_title AS jobTitle,
+        rv.company_name AS companyName,
+        rv.created_at AS createdAt,
+        j.job_url AS jobUrl,
+        j.fit_score AS fitScore
+      FROM resume_variants rv
+      LEFT JOIN jobs j ON j.id = rv.job_id
+      WHERE rv.resume_id = ?
+      ORDER BY rv.created_at DESC`,
+      [resumeId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching variants:", error);
+    res.status(500).json({ error: "Failed to fetch variants" });
+  }
+});
+
 export default router;

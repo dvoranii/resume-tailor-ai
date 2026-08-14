@@ -134,6 +134,14 @@ export default function Dashboard() {
               >
                 Open
               </button>
+              {resume.variantCount > 0 && (
+                <button
+                  onClick={() => navigate(`/base-resume/${resume.id}/variants`)}
+                  className="text-text-muted hover:text-accent text-sm"
+                >
+                  View Variants ({resume.variantCount})
+                </button>
+              )}
               {!resume.isDefault && (
                 <button
                   onClick={() => setDefault(resume.id)}

@@ -1,5 +1,5 @@
 import { useResumeBuilder } from "../../context/ResumeBuilderContext";
-import type { SectionId } from "@resumeai/shared";
+// import type { SectionId } from "@resumeai/shared";
 import { Mail, Phone, MapPin, Globe } from "lucide-react";
 import linkedinIcon from "../../assets/linked-icon.svg";
 import githubIcon from "../../assets/github-icon.svg";
@@ -34,13 +34,13 @@ export default function ResumePreview() {
       : `https://${url}`;
   };
 
-  const sectionRenderers: Record<SectionId, React.ReactNode> = {
+  const sectionRenderers: Record<string, React.ReactNode> = {
     summary: summary && (
       <Section title="Summary" color={sectionTitleColor}>
         <p
           style={{
             lineHeight: 1.5,
-            textAlign: summaryAlignment,
+            textAlign: summaryAlignment as "left" | "center",
             fontSize: "11px",
           }}
         >
@@ -92,14 +92,16 @@ export default function ResumePreview() {
                       listStyleType: "disc",
                     }}
                   >
-                    {role.bullets.map((bullet) => (
-                      <li
-                        key={bullet.id}
-                        style={{ lineHeight: 1.5, marginBottom: "1px" }}
-                      >
-                        {bullet.content}
-                      </li>
-                    ))}
+                    {role.bullets.map(
+                      (bullet: { id: string; content: string }) => (
+                        <li
+                          key={bullet.id}
+                          style={{ lineHeight: 1.5, marginBottom: "1px" }}
+                        >
+                          {bullet.content}
+                        </li>
+                      )
+                    )}
                   </ul>
                 )}
               </div>
@@ -167,14 +169,16 @@ export default function ResumePreview() {
                   listStyleType: "disc",
                 }}
               >
-                {project.bullets.map((bullet) => (
-                  <li
-                    key={bullet.id}
-                    style={{ lineHeight: 1.5, marginBottom: "1px" }}
-                  >
-                    {bullet.content}
-                  </li>
-                ))}
+                {project.bullets.map(
+                  (bullet: { id: string; content: string }) => (
+                    <li
+                      key={bullet.id}
+                      style={{ lineHeight: 1.5, marginBottom: "1px" }}
+                    >
+                      {bullet.content}
+                    </li>
+                  )
+                )}
               </ul>
             )}
           </div>
@@ -206,7 +210,7 @@ export default function ResumePreview() {
               fontSize: "24px",
               fontWeight: "700",
               lineHeight: 1.2,
-              textAlign: nameAlignment,
+              textAlign: nameAlignment as "left" | "center",
             }}
           >
             {personal.name || "Your Name"}
@@ -217,7 +221,7 @@ export default function ResumePreview() {
               color: sectionTitleColor,
               fontWeight: "600",
               marginTop: "2px",
-              textAlign: titleAlignment,
+              textAlign: titleAlignment as "left" | "center",
             }}
           >
             {personal.title || "Your Title"}
@@ -355,7 +359,9 @@ export default function ResumePreview() {
         </div>
 
         {sectionOrder.map((sectionId) => (
-          <div key={sectionId}>{sectionRenderers[sectionId]}</div>
+          <div key={sectionId as string}>
+            {sectionRenderers[sectionId as string]}
+          </div>
         ))}
       </div>
     </div>

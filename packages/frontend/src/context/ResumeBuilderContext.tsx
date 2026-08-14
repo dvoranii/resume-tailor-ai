@@ -36,6 +36,9 @@ interface ResumeBuilderContextType {
   resume: Resume;
   isLoading: boolean;
   resumeName: string;
+  isVariant: boolean;
+  variantJobTitle: string;
+  variantCompany: string;
   updatePersonal: (data: Resume["personal"]) => void;
   updateSummary: (summary: string) => void;
   updateSkills: (skills: Resume["skills"]) => void;
@@ -44,6 +47,7 @@ interface ResumeBuilderContextType {
   updateEducation: (education: Resume["education"]) => void;
   saveResume: (resume: Resume) => Promise<void>;
   loadResume: (id?: number | null) => Promise<void>;
+  loadVariant: (variantId: number) => Promise<void>;
   saveAsNew: (name: string, isDefault: boolean) => Promise<number>;
   exportPdf: () => Promise<void>;
   templateConfig: TemplateConfig;
@@ -64,6 +68,13 @@ export function ResumeBuilderProvider({
   const [isLoading, setIsLoading] = useState(true);
   const [currentResumeId, setCurrentResumeId] = useState<number | null>(null);
   const [resumeName, setResumeName] = useState<string>("My Resume");
+
+  // Variant state
+  const [currentVariantId, setCurrentVariantId] = useState<number | null>(null);
+  const [isVariant, setIsVariant] = useState(false);
+  const [variantJobTitle, setVariantJobTitle] = useState("");
+  const [variantCompany, setVariantCompany] = useState("");
+
   const [saveTimeout, setSaveTimeout] = useState<number | null>(null);
   const [configSaveTimeout, setConfigSaveTimeout] = useState<number | null>(
     null
@@ -76,6 +87,10 @@ export function ResumeBuilderProvider({
     setResume(defaultResume);
     setCurrentResumeId(null);
     setResumeName("Untitled");
+    setCurrentVariantId(null);
+    setIsVariant(false);
+    setVariantJobTitle("");
+    setVariantCompany("");
   }, []);
 
   const fetchResumeData = useCallback(
@@ -137,6 +152,101 @@ export function ResumeBuilderProvider({
     [fetchResumeData]
   );
 
+  const loadVariant = useCallback(async (variantId: number) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/resume/variants/${variantId}`);
+      if (!response.ok) throw new Error("Failed to fetch variant");
+      const data = await response.json();
+      setResume(data.tailoredData);
+      setCurrentVariantId(variantId);
+      setIsVariant(true);
+      setVariantJobTitle(data.jobTitle || "");
+      setVariantCompany(data.companyName || "");
+      setResumeName(`${data.jobTitle} at ${data.companyName} (Tailored)`);
+      setCurrentResumeId(null);
+    } catch (error) {
+      console.error("Error loading variant:", error);
+      resetToEmpty();
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const saveVariant = useCallback(async (variantId: number, data: Resume) => {
+    try {
+      const response = await fetch(`${API_BASE}/resume/variants/${variantId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tailoredData: data }),
+      });
+      if (!response.ok) throw new Error("Failed to save variant");
+    } catch (error) {
+      console.error("Error saving variant:", error);
+    }
+  }, []);
+
+  const saveResume = useCallback(
+    async (latestResume: Resume) => {
+      if (isVariant && currentVariantId) {
+        await saveVariant(currentVariantId, latestResume);
+        return;
+      }
+      if (currentResumeId === null) {
+        console.warn("Cannot save without a resume ID – use saveAsNew instead");
+        return;
+      }
+
+      try {
+        const payload = {
+          ...latestResume,
+          resumeId: currentResumeId,
+          name: resumeName,
+          isDefault: false,
+        };
+
+        const response = await fetch(`${API_BASE}/resume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          console.error("Failed to save resume:", response.status);
+        }
+      } catch (error) {
+        console.error("Error saving resume:", error);
+      }
+    },
+    [currentResumeId, resumeName, isVariant, currentVariantId, saveVariant]
+  );
+
+  const debouncedSave = (latestResume: Resume) => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    const timeout = window.setTimeout(() => {
+      saveResume(latestResume);
+    }, 800);
+    setSaveTimeout(timeout);
+  };
+
+  const updateField = <K extends keyof Resume>(field: K, value: Resume[K]) => {
+    const updated = { ...resume, [field]: value };
+    setResume(updated);
+    debouncedSave(updated);
+  };
+
+  const updatePersonal = (data: Resume["personal"]) =>
+    updateField("personal", data);
+  const updateSummary = (summary: string) => updateField("summary", summary);
+  const updateSkills = (skills: Resume["skills"]) =>
+    updateField("skills", skills);
+  const updateExperience = (experience: Resume["experience"]) =>
+    updateField("experience", experience);
+  const updateProjects = (projects: Resume["projects"]) =>
+    updateField("projects", projects);
+  const updateEducation = (education: Resume["education"]) =>
+    updateField("education", education);
+
   const saveAsNew = useCallback(
     async (name: string, isDefault: boolean): Promise<number> => {
       try {
@@ -164,60 +274,6 @@ export function ResumeBuilderProvider({
     },
     [resume]
   );
-
-  const saveResume = async (latestResume: Resume) => {
-    if (currentResumeId === null) {
-      console.warn("Cannot save without a resume ID – use saveAsNew instead");
-      return;
-    }
-
-    try {
-      const payload = {
-        ...latestResume,
-        resumeId: currentResumeId,
-        name: resumeName,
-        isDefault: false,
-      };
-
-      const response = await fetch(`${API_BASE}/resume`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        console.error("Failed to save resume:", response.status);
-      }
-    } catch (error) {
-      console.error("Error saving resume:", error);
-    }
-  };
-
-  const debouncedSave = (latestResume: Resume) => {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    const timeout = window.setTimeout(() => {
-      saveResume(latestResume);
-    }, 800);
-    setSaveTimeout(timeout);
-  };
-
-  const updateField = <K extends keyof Resume>(field: K, value: Resume[K]) => {
-    const updated = { ...resume, [field]: value };
-    setResume(updated);
-    debouncedSave(updated);
-  };
-
-  const updatePersonal = (data: Resume["personal"]) =>
-    updateField("personal", data);
-  const updateSummary = (summary: string) => updateField("summary", summary);
-  const updateSkills = (skills: Resume["skills"]) =>
-    updateField("skills", skills);
-  const updateExperience = (experience: Resume["experience"]) =>
-    updateField("experience", experience);
-  const updateProjects = (projects: Resume["projects"]) =>
-    updateField("projects", projects);
-  const updateEducation = (education: Resume["education"]) =>
-    updateField("education", education);
 
   const exportPdf = async () => {
     const response = await fetch(`${API_BASE}/export/pdf`, {
@@ -276,6 +332,9 @@ export function ResumeBuilderProvider({
         resume,
         isLoading,
         resumeName,
+        isVariant,
+        variantJobTitle,
+        variantCompany,
         updatePersonal,
         updateSummary,
         updateSkills,
@@ -284,6 +343,7 @@ export function ResumeBuilderProvider({
         updateEducation,
         saveResume,
         loadResume,
+        loadVariant,
         saveAsNew,
         exportPdf,
         templateConfig,
