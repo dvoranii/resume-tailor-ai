@@ -4,10 +4,21 @@ import {
   setActiveResumeId,
   getActiveResumeId,
   clearActiveResumeId,
+  clearActiveVariantId,
 } from "../utils/activeResume";
 
 import { API_BASE } from "../types/jobs";
 
+interface RawResume {
+  id: number;
+  name: string;
+  summary: string;
+  isDefault: number;
+  isComplete: number;
+  variantCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
 interface BaseResume {
   id: number;
   name: string;
@@ -17,6 +28,14 @@ interface BaseResume {
   variantCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+function convertToBaseResume(raw: RawResume): BaseResume {
+  return {
+    ...raw,
+    isDefault: raw.isDefault === 1,
+    isComplete: raw.isComplete === 1,
+  };
 }
 
 export default function Dashboard() {
@@ -31,8 +50,9 @@ export default function Dashboard() {
   const fetchResumes = async () => {
     try {
       const res = await fetch(`${API_BASE}/resume/list`);
-      const data = await res.json();
-      setResumes(data);
+      const rawData: RawResume[] = await res.json();
+      const mapped = rawData.map(convertToBaseResume);
+      setResumes(mapped);
     } catch (error) {
       console.error("Failed to fetch resumes:", error);
     } finally {
@@ -47,7 +67,8 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isDefault: true }),
       });
-      // Refresh list
+      setActiveResumeId(id);
+      clearActiveVariantId();
       fetchResumes();
     } catch (error) {
       console.error("Failed to set default:", error);

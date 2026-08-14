@@ -4,8 +4,6 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 
 const router = Router();
 
-// POST /api/v1/api-keys
-// Store or update an API key for a provider
 router.post("/", async (req, res) => {
   const { provider, apiKey } = req.body;
 
@@ -13,7 +11,6 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Provider and API key are required" });
   }
 
-  // Validate provider
   const validProviders = ["apify", "openai"];
   if (!validProviders.includes(provider)) {
     return res
@@ -23,7 +20,6 @@ router.post("/", async (req, res) => {
 
   const connection = await pool.getConnection();
   try {
-    // Insert or update using ON DUPLICATE KEY UPDATE
     const [result] = await connection.query<ResultSetHeader>(
       `INSERT INTO user_api_keys (user_id, provider, api_key)
        VALUES (1, ?, ?)
@@ -46,8 +42,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/v1/api-keys/:provider
-// Get the API key for a specific provider
 router.get("/:provider", async (req, res) => {
   const { provider } = req.params;
 

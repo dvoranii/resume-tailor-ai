@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, ChevronDown, ChevronUp, Folder } from "lucide-react";
 import { API_BASE, type Collection } from "../../types/jobs";
+
+interface BaseResumeOption {
+  id: number;
+  name: string;
+}
 
 export default function NewCollectionForm({
   onCreated,
@@ -10,16 +15,29 @@ export default function NewCollectionForm({
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resumes, setResumes] = useState<BaseResumeOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     searchQuery: "",
     location: "",
     maxItems: "25",
+    baseResumeId: "",
   });
 
-  const set =
-    (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  useEffect(() => {
+    if (!expanded || resumes.length > 0) return;
+    fetch(`${API_BASE}/resume/list`)
+      .then((r) => r.json())
+      .then((data: BaseResumeOption[]) => setResumes(data))
+      .catch(() => setError("Failed to load base resumes"));
+  }, [expanded, resumes.length]);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async () => {
     if (!form.name || !form.searchQuery) {
@@ -37,6 +55,7 @@ export default function NewCollectionForm({
           searchQuery: form.searchQuery,
           location: form.location || null,
           maxItems: Number(form.maxItems) || 25,
+          baseResumeId: Number(form.baseResumeId),
         }),
       });
       const data = await response.json();
@@ -53,7 +72,13 @@ export default function NewCollectionForm({
         lastScrapedAt: null,
         totalJobsFound: 0,
       });
-      setForm({ name: "", searchQuery: "", location: "", maxItems: "25" });
+      setForm({
+        name: "",
+        searchQuery: "",
+        location: "",
+        maxItems: "25",
+        baseResumeId: "",
+      });
       setExpanded(false);
     } catch {
       setError("Failed to connect to server");
@@ -89,7 +114,8 @@ export default function NewCollectionForm({
               <input
                 type="text"
                 value={form.name}
-                onChange={set("name")}
+                name="name"
+                onChange={handleChange}
                 placeholder="Toronto Frontend Roles"
                 className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
               />
@@ -101,7 +127,8 @@ export default function NewCollectionForm({
               <input
                 type="text"
                 value={form.searchQuery}
-                onChange={set("searchQuery")}
+                name="searchQuery"
+                onChange={handleChange}
                 placeholder="Full Stack Developer"
                 className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
               />
@@ -111,7 +138,8 @@ export default function NewCollectionForm({
               <input
                 type="text"
                 value={form.location}
-                onChange={set("location")}
+                name="location"
+                onChange={handleChange}
                 placeholder="Toronto, ON"
                 className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
               />
@@ -124,9 +152,28 @@ export default function NewCollectionForm({
                 type="number"
                 min={10}
                 value={form.maxItems}
-                onChange={set("maxItems")}
+                name="maxItems"
+                onChange={handleChange}
                 className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
               />
+            </div>
+            <div className="flex flex-col gap-1.5 col-span-2">
+              <label className="text-xs text-text-muted">
+                Score Jobs Against<span className="text-red-400 ml-1">*</span>
+              </label>
+              <select
+                value={form.baseResumeId}
+                name="baseResumeId"
+                onChange={handleChange}
+                className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
+              >
+                <option value="">Select a base resume...</option>
+                {resumes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

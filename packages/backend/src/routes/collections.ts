@@ -3,13 +3,18 @@ import { pool } from "../db";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { ApifyService } from "../services/apifyService";
 import { buildLinkedInUrl } from "../utils/linkedinUrlBuilder";
+import {
+  scoreJobAgainstResume,
+  MIN_FIT_SCORE,
+} from "../services/scoringService";
 
 const router = Router();
 const MIN_ITEMS = 10;
 
 // POST /api/v1/collections
 router.post("/", async (req, res) => {
-  const { name, searchQuery, location, filters, maxItems } = req.body;
+  const { name, searchQuery, location, filters, maxItems, baseResumeId } =
+    req.body;
 
   if (!name || !searchQuery) {
     return res.status(400).json({ error: "name and searchQuery are required" });
@@ -25,8 +30,8 @@ router.post("/", async (req, res) => {
   try {
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO job_collections
-        (user_id, name, search_query, search_location, search_filters, constructed_url, max_items)
-       VALUES (1, ?, ?, ?, ?, ?, ?)`,
+        (user_id, name, search_query, search_location, search_filters, constructed_url, max_items, base_resume_id)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name,
         searchQuery,
@@ -34,6 +39,7 @@ router.post("/", async (req, res) => {
         JSON.stringify(filters || {}),
         constructedUrl,
         clampedMax,
+        baseResumeId || null,
       ]
     );
     res.status(201).json({ id: result.insertId, constructedUrl });
@@ -50,6 +56,7 @@ router.get("/", async (_req, res) => {
       `SELECT
         c.id, c.name, c.search_query AS searchQuery, c.search_location AS location,
         c.constructed_url AS constructedUrl, c.max_items AS maxItems,
+        c.base_resume_id AS baseResumeId,
         c.last_scraped_at AS lastScrapedAt, c.total_jobs_found AS totalJobsFound,
         COUNT(j.id) AS jobCount
       FROM job_collections c
@@ -71,6 +78,7 @@ router.get("/:id", async (req, res) => {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT id, name, search_query AS searchQuery, search_location AS location,
               constructed_url AS constructedUrl, max_items AS maxItems,
+              base_resume_id AS baseResumeId,
               last_scraped_at AS lastScrapedAt, total_jobs_found AS totalJobsFound
        FROM job_collections WHERE id = ?`,
       [id]
@@ -97,12 +105,19 @@ router.post("/:id/scrape", async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT id, constructed_url AS constructedUrl, max_items AS maxItems FROM job_collections WHERE id = ?`,
+      `SELECT id, constructed_url AS constructedUrl, max_items AS maxItems, base_resume_id AS baseResumeId FROM job_collections WHERE id = ?`,
       [id]
     );
     if (rows.length === 0)
       return res.status(404).json({ error: "Collection not found" });
     const collection = rows[0];
+
+    if (!collection.baseResumeId) {
+      return res.status(400).json({
+        error:
+          "This collection has no base resume selected. Set one before scraping.",
+      });
+    }
 
     const apiKey = await ApifyService.getApiKey();
     if (!apiKey)
@@ -114,17 +129,35 @@ router.post("/:id/scrape", async (req, res) => {
       collection.maxItems
     );
 
-    let inserted = 0;
+    let saved = 0;
+    let skipped = 0;
+
     for (const job of jobs) {
       if (!job.id) continue;
+
+      const scoreResult = await scoreJobAgainstResume(
+        job.descriptionText,
+        collection.baseResumeId
+      );
+
+      if (scoreResult.score < MIN_FIT_SCORE) {
+        skipped++;
+        continue;
+      }
+
       const [result] = await pool.query<ResultSetHeader>(
         `INSERT INTO jobs
           (company_name, job_title, job_url, job_description, seniority_level, salary,
-           applicants_count, posted_at, collection_id, apify_id, is_auto_scraped, scraped_at, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), 'new')
+           applicants_count, posted_at, collection_id, apify_id, is_auto_scraped, scraped_at,
+           status, fit_score, reasoning, suggested_focus, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), 'new', ?, ?, ?, 1)
          ON DUPLICATE KEY UPDATE
+           collection_id = VALUES(collection_id), 
            job_description = VALUES(job_description),
            applicants_count = VALUES(applicants_count),
+           fit_score = VALUES(fit_score),
+           reasoning = VALUES(reasoning),
+           suggested_focus = VALUES(suggested_focus),
            scraped_at = NOW()`,
         [
           job.companyName,
@@ -137,17 +170,25 @@ router.post("/:id/scrape", async (req, res) => {
           job.postedAt,
           id,
           job.id,
+          scoreResult.score,
+          scoreResult.reasoning || null,
+          scoreResult.suggestedFocus || null,
         ]
       );
-      if (result.affectedRows === 1) inserted++; // 1 = fresh insert, 2 = update
+      if (result.affectedRows >= 1) saved++;
     }
 
     await pool.query(
       `UPDATE job_collections SET last_scraped_at = NOW(), total_jobs_found = ? WHERE id = ?`,
-      [jobs.length, id]
+      [saved, id]
     );
 
-    res.json({ success: true, scraped: jobs.length, newJobs: inserted });
+    res.json({
+      success: true,
+      scraped: jobs.length,
+      saved,
+      skipped,
+    });
   } catch (error) {
     console.error("Error scraping collection:", error);
     res.status(500).json({
