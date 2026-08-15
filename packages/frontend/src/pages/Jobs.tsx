@@ -70,12 +70,25 @@ export default function Jobs() {
 
   const handleDeleteCollection = async (id: number) => {
     try {
-      await fetch(`${API_BASE}/collections/${id}`, { method: "DELETE" });
+      setJobs((prev) => prev.filter((job) => job.collectionId !== id));
       setCollections((prev) => prev.filter((c) => c.id !== id));
-      if (activeCollection === id) setActiveCollection("all");
+
+      const response = await fetch(`${API_BASE}/collections/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete collection");
+      }
+
+      if (activeCollection === id) {
+        setActiveCollection("all");
+      }
+
       await fetchJobs();
-    } catch {
-      console.error("Failed to delete collection");
+    } catch (error) {
+      console.error("Failed to delete collection:", error);
+      await Promise.all([fetchJobs(), fetchCollections()]);
     }
   };
 
