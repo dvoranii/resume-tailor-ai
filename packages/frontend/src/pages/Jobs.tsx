@@ -8,11 +8,11 @@ import JobCard from "../components/jobs/JobCard";
 export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [activeCollection, setActiveCollection] = useState<number | "all">(
-    "all"
-  );
+  const [activeTab, setActiveTab] = useState<"all" | "manual" | number>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchJobs = async () => {
     try {
@@ -41,6 +41,11 @@ export default function Jobs() {
     fetchJobs();
     fetchCollections();
   }, []);
+
+  // Reset to page 1 when the active tab or the jobs list changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, jobs]);
 
   const handleAdd = (job: Job) => setJobs((prev) => [job, ...prev]);
 
@@ -81,8 +86,8 @@ export default function Jobs() {
         throw new Error("Failed to delete collection");
       }
 
-      if (activeCollection === id) {
-        setActiveCollection("all");
+      if (activeTab === id) {
+        setActiveTab("all");
       }
 
       await fetchJobs();
@@ -92,10 +97,28 @@ export default function Jobs() {
     }
   };
 
-  const visibleJobs =
-    activeCollection === "all"
-      ? jobs
-      : jobs.filter((j) => j.collectionId === activeCollection);
+  // Determine which jobs to show based on active tab
+  const visibleJobs = (() => {
+    if (activeTab === "all") return jobs;
+    if (activeTab === "manual")
+      return jobs.filter((j) => j.collectionId === null);
+    return jobs.filter((j) => j.collectionId === activeTab);
+  })();
+
+  const hasManualJobs = jobs.some((j) => j.collectionId === null);
+
+  // Pagination
+  const totalPages = Math.ceil(visibleJobs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedJobs = visibleJobs.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl">
@@ -115,33 +138,51 @@ export default function Jobs() {
       <NewCollectionForm onCreated={handleCollectionCreated} />
       <AddJobForm onAdd={handleAdd} />
 
-      {collections.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <span className="text-xs text-text-muted">Collections</span>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* Tabs + Collections */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs text-text-muted">Collections</span>
+        <div className="flex items-start gap-3">
+          {/* Static tabs – stacked vertically */}
+          <div className="flex flex-col gap-1 min-w-[120px]">
             <button
-              onClick={() => setActiveCollection("all")}
-              className={`shrink-0 border rounded-lg px-3 py-2 text-sm transition-colors ${
-                activeCollection === "all"
+              onClick={() => setActiveTab("all")}
+              className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors ${
+                activeTab === "all"
                   ? "border-accent bg-bg-input text-text-primary"
                   : "border-border bg-bg-surface text-text-muted hover:bg-bg-input"
               }`}
             >
               All Jobs
             </button>
+            {hasManualJobs && (
+              <button
+                onClick={() => setActiveTab("manual")}
+                className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors ${
+                  activeTab === "manual"
+                    ? "border-accent bg-bg-input text-text-primary"
+                    : "border-border bg-bg-surface text-text-muted hover:bg-bg-input"
+                }`}
+              >
+                Manual Jobs
+              </button>
+            )}
+          </div>
+
+          {/* Collections – horizontally scrollable */}
+          <div className="flex-1 overflow-x-auto flex items-center gap-2 pb-1">
             {collections.map((c) => (
               <CollectionCard
                 key={c.id}
                 collection={c}
-                active={activeCollection === c.id}
-                onSelect={() => setActiveCollection(c.id)}
+                active={activeTab === c.id}
+                onSelect={() => setActiveTab(c.id)}
                 onScrape={() => handleScrapeCollection(c.id)}
                 onDelete={() => handleDeleteCollection(c.id)}
               />
             ))}
           </div>
         </div>
-      )}
+      </div>
 
       {loading && <p className="text-text-muted text-sm">Loading jobs...</p>}
       {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -149,24 +190,53 @@ export default function Jobs() {
       {!loading && visibleJobs.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-lg">
           <p className="text-text-muted text-sm">
-            {activeCollection === "all"
+            {activeTab === "all"
               ? "No jobs added yet."
+              : activeTab === "manual"
+              ? "No manual jobs added."
               : "No jobs in this collection yet."}
           </p>
           <p className="text-text-muted text-xs mt-1">
-            {activeCollection === "all"
+            {activeTab === "all"
               ? "Use the form above to add your first job, or create a collection to auto-scrape."
+              : activeTab === "manual"
+              ? "Add a job manually using the form above."
               : "Click Re-scrape above to fetch jobs."}
           </p>
         </div>
       )}
 
-      {visibleJobs.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {visibleJobs.map((job) => (
-            <JobCard key={job.id} job={job} onDelete={handleDelete} />
-          ))}
-        </div>
+      {paginatedJobs.length > 0 && (
+        <>
+          <div className="flex flex-col gap-3">
+            {paginatedJobs.map((job) => (
+              <JobCard key={job.id} job={job} onDelete={handleDelete} />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-border rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-input transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-text-muted">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-border rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-input transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
