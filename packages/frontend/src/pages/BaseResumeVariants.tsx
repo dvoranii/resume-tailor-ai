@@ -48,6 +48,11 @@ export default function BaseResumeVariants() {
     navigate(`/resume?variantId=${variantId}`);
   };
 
+  const handleBack = () => {
+    // Navigate directly to the base resume editor
+    navigate(`/resume?id=${id}`);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -55,10 +60,10 @@ export default function BaseResumeVariants() {
           Variants for "{baseResumeName || "Loading..."}"
         </h1>
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="text-text-muted hover:text-text-primary text-sm"
         >
-          ← Back
+          ← Back to Resume
         </button>
       </div>
 
