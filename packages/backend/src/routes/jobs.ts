@@ -5,34 +5,49 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 const router = Router();
 
 router.get("/", async (req, res) => {
-  const { collectionId } = req.query;
+  const { collectionId, baseResumeId } = req.query;
 
-  let query = `SELECT 
-              id,
-              company_name AS companyName,
-              job_title AS jobTitle,
-              job_url AS jobUrl,
-              job_description AS jobDescription,
-              fit_score AS fitScore,
-              seniority_level AS seniorityLevel,
-              salary,
-              applicants_count AS applicantsCount,
-              posted_at AS postedAt,
-              suggested_focus AS suggestedFocus,
-              reasoning,
-              status,
-              variant_id AS variantId,
-              collection_id AS collectionId
-            FROM jobs`;
+  let query = `
+    SELECT 
+      id,
+      company_name AS companyName,
+      job_title AS jobTitle,
+      job_url AS jobUrl,
+      job_description AS jobDescription,
+      fit_score AS fitScore,
+      seniority_level AS seniorityLevel,
+      salary,
+      applicants_count AS applicantsCount,
+      posted_at AS postedAt,
+      suggested_focus AS suggestedFocus,
+      reasoning,
+      status,
+      variant_id AS variantId,
+      collection_id AS collectionId
+    FROM jobs
+  `;
 
   const params: (string | number)[] = [];
+  const conditions: string[] = [];
 
   if (collectionId) {
-    query += ` WHERE collection_id = ?`;
+    conditions.push("collection_id = ?");
     params.push(collectionId as string);
   }
 
-  query += ` ORDER BY created_at DESC`;
+  if (baseResumeId) {
+    // Filter by collections that have this base_resume_id
+    conditions.push(
+      "collection_id IN (SELECT id FROM job_collections WHERE base_resume_id = ?)"
+    );
+    params.push(baseResumeId as string);
+  }
+
+  if (conditions.length > 0) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
+
+  query += " ORDER BY created_at DESC";
 
   try {
     const [rows] = await pool.query<RowDataPacket[]>(query, params);

@@ -116,8 +116,11 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
                 },
                 {
                   field: "fitScore",
-                  label: "Fit Score (1-10)",
-                  placeholder: "8",
+                  label: "Fit Score (0-100)",
+                  placeholder: "e.g., 75",
+                  min: 0,
+                  max: 100,
+                  step: 1,
                 },
                 {
                   field: "seniorityLevel",
@@ -134,19 +137,25 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
                 label: string;
                 placeholder: string;
                 required?: boolean;
+                min?: number;
+                max?: number;
+                step?: number;
               }[]
-            ).map(({ field, label, placeholder, required }) => (
+            ).map(({ field, label, placeholder, required, min, max, step }) => (
               <div key={field} className="flex flex-col gap-1.5">
                 <label className="text-xs text-text-muted">
                   {label}
                   {required && <span className="text-red-400 ml-1">*</span>}
                 </label>
                 <input
-                  type="text"
+                  type={field === "fitScore" ? "number" : "text"}
                   name={field}
                   value={form[field]}
                   onChange={handleChange}
                   placeholder={placeholder}
+                  min={min}
+                  max={max}
+                  step={step}
                   className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
                 />
               </div>

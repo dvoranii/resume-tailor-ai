@@ -30,6 +30,7 @@ function ResumeBuilderContent() {
     resumeName,
     isVariant,
     variantJobTitle,
+    baseResumeIdForVariant,
     variantCompany,
   } = useResumeBuilder();
   const [exporting, setExporting] = useState(false);
@@ -44,7 +45,7 @@ function ResumeBuilderContent() {
   useEffect(() => {
     if (isNew) {
       loadResume(null);
-      clearActiveState(); // clear both
+      clearActiveState();
     } else if (variantId) {
       loadVariant(Number(variantId));
       setActiveVariantId(Number(variantId));
@@ -54,7 +55,6 @@ function ResumeBuilderContent() {
       setActiveResumeId(Number(resumeId));
       clearActiveVariantId();
     } else {
-      // No ID in URL – check localStorage
       const activeVariant = getActiveVariantId();
       if (activeVariant) {
         navigate(`/resume?variantId=${activeVariant}`);
@@ -65,10 +65,21 @@ function ResumeBuilderContent() {
         navigate(`/resume?id=${activeResume}`);
         return;
       }
-      // Fallback to default
       loadResume();
     }
   }, [resumeId, variantId, isNew, loadResume, loadVariant, navigate]);
+
+  useEffect(() => {
+    if (isVariant && baseResumeIdForVariant && variantId) {
+      const currentBaseResumeId = searchParams.get("baseResumeId");
+      if (currentBaseResumeId !== String(baseResumeIdForVariant)) {
+        navigate(
+          `/resume?variantId=${variantId}&baseResumeId=${baseResumeIdForVariant}`,
+          { replace: true }
+        );
+      }
+    }
+  }, [isVariant, baseResumeIdForVariant, variantId, navigate, searchParams]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -98,7 +109,11 @@ function ResumeBuilderContent() {
 
   const handleBackToVariants = () => {
     clearActiveVariantId();
-    navigate(-1);
+    if (baseResumeIdForVariant) {
+      navigate(`/base-resume/${baseResumeIdForVariant}/variants`);
+    } else {
+      navigate(-1);
+    }
   };
 
   const headerTitle = isVariant
@@ -147,7 +162,10 @@ function ResumeBuilderContent() {
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0">
-        <ResumeForm />
+        <ResumeForm
+          isVariant={isVariant}
+          resumeId={resumeId ? Number(resumeId) : undefined}
+        />
         <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
           <TemplateConfigPanel />
           <ResumePreview />

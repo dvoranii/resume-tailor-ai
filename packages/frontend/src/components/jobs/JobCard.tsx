@@ -1,4 +1,12 @@
-import { Trash2, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import {
+  Trash2,
+  ExternalLink,
+  Sparkles,
+  Info,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { type Job, statusColors } from "../../types/jobs";
 
 export default function JobCard({
@@ -8,6 +16,8 @@ export default function JobCard({
   job: Job;
   onDelete: (id: number) => void;
 }) {
+  const [showReasoning, setShowReasoning] = useState(false);
+
   const {
     id,
     jobTitle,
@@ -15,6 +25,7 @@ export default function JobCard({
     status,
     fitScore,
     suggestedFocus,
+    reasoning,
     jobUrl,
   } = job;
 
@@ -31,18 +42,53 @@ export default function JobCard({
           >
             {status}
           </span>
-          {fitScore && (
-            <span className="text-xs text-text-muted bg-bg-input px-2 py-0.5 rounded-full">
-              Fit: {fitScore}/10
+          {fitScore !== null && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${
+                fitScore >= 70
+                  ? "bg-green-950/40 text-green-300 border border-green-800"
+                  : fitScore >= 50
+                  ? "bg-yellow-950/40 text-yellow-300 border border-yellow-800"
+                  : "bg-red-950/40 text-red-300 border border-red-800"
+              }`}
+            >
+              Fit: {fitScore}/100
             </span>
           )}
         </div>
+
+        {/* Suggested Focus */}
         {suggestedFocus && (
-          <p className="text-xs text-text-muted truncate">
-            Focus: {suggestedFocus}
-          </p>
+          <div className="flex items-start gap-1.5 mt-1">
+            <Sparkles size={13} className="text-accent shrink-0 mt-0.5" />
+            <p className="text-xs text-text-muted italic">{suggestedFocus}</p>
+          </div>
+        )}
+
+        {/* Reasoning - Accordion Style */}
+        {reasoning && (
+          <div className="mt-1">
+            <button
+              onClick={() => setShowReasoning(!showReasoning)}
+              className="flex items-center gap-1 text-xs text-text-muted/70 hover:text-text-muted transition-colors"
+            >
+              <Info size={12} />
+              <span>AI Reasoning</span>
+              {showReasoning ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
+            </button>
+            {showReasoning && (
+              <div className="mt-1 p-2 bg-bg-input/50 rounded-md border border-border/50 text-xs text-text-muted leading-relaxed">
+                {reasoning}
+              </div>
+            )}
+          </div>
         )}
       </div>
+
       <div className="flex items-center gap-2 shrink-0">
         {jobUrl && (
           <a

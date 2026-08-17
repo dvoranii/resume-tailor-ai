@@ -39,6 +39,7 @@ interface ResumeBuilderContextType {
   isVariant: boolean;
   variantJobTitle: string;
   variantCompany: string;
+  baseResumeIdForVariant: number | null;
   updatePersonal: (data: Resume["personal"]) => void;
   updateSummary: (summary: string) => void;
   updateSkills: (skills: Resume["skills"]) => void;
@@ -64,16 +65,20 @@ export function ResumeBuilderProvider({
 }: {
   children: React.ReactNode;
 }) {
+  // base resume
   const [resume, setResume] = useState<Resume>(defaultResume);
   const [isLoading, setIsLoading] = useState(true);
   const [currentResumeId, setCurrentResumeId] = useState<number | null>(null);
   const [resumeName, setResumeName] = useState<string>("My Resume");
 
-  // Variant state
+  // variants
   const [currentVariantId, setCurrentVariantId] = useState<number | null>(null);
   const [isVariant, setIsVariant] = useState(false);
   const [variantJobTitle, setVariantJobTitle] = useState("");
   const [variantCompany, setVariantCompany] = useState("");
+  const [baseResumeIdForVariant, setBaseResumeIdForVariant] = useState<
+    number | null
+  >(null);
 
   const [saveTimeout, setSaveTimeout] = useState<number | null>(null);
   const [configSaveTimeout, setConfigSaveTimeout] = useState<number | null>(
@@ -91,6 +96,7 @@ export function ResumeBuilderProvider({
     setIsVariant(false);
     setVariantJobTitle("");
     setVariantCompany("");
+    setBaseResumeIdForVariant(null);
   }, []);
 
   const fetchResumeData = useCallback(
@@ -165,6 +171,7 @@ export function ResumeBuilderProvider({
       setVariantCompany(data.companyName || "");
       setResumeName(`${data.jobTitle} at ${data.companyName} (Tailored)`);
       setCurrentResumeId(null);
+      setBaseResumeIdForVariant(data.resumeId || null);
     } catch (error) {
       console.error("Error loading variant:", error);
       resetToEmpty();
@@ -335,6 +342,7 @@ export function ResumeBuilderProvider({
         isVariant,
         variantJobTitle,
         variantCompany,
+        baseResumeIdForVariant,
         updatePersonal,
         updateSummary,
         updateSkills,

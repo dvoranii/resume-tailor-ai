@@ -3,8 +3,6 @@ import { Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import type { Resume } from "@resumeai/shared";
 import { API_BASE } from "../../../types/jobs";
 
-// const API_BASE = "http://localhost:3001/api/v1";
-
 interface Job {
   id: number;
   companyName: string;
@@ -244,7 +242,13 @@ function DiffReview({
   );
 }
 
-export default function TailorForm() {
+export default function TailorForm({
+  resumeId,
+  isVariant,
+}: {
+  resumeId?: number;
+  isVariant?: boolean;
+}) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [jobDescription, setJobDescription] = useState("");
@@ -256,7 +260,15 @@ export default function TailorForm() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const response = await fetch(`${API_BASE}/jobs`);
+        if (isVariant) {
+          setJobs([]);
+          return;
+        }
+
+        const url = resumeId
+          ? `${API_BASE}/jobs?baseResumeId=${resumeId}`
+          : `${API_BASE}/jobs`;
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           setJobs(data);
@@ -266,7 +278,7 @@ export default function TailorForm() {
       }
     };
     fetchJobs();
-  }, []);
+  }, [resumeId, isVariant]);
 
   const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
 

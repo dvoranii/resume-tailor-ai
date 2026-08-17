@@ -7,20 +7,29 @@ import SkillsForm from "./forms/SkillsForm";
 import ProjectsForm from "./forms/ProjectsForm";
 import TailorForm from "./forms/TailorForm";
 
-const tabs = [
+const baseTabs = [
   { id: "personal", label: "Personal Info" },
   { id: "summary", label: "Summary" },
   { id: "experience", label: "Experience" },
   { id: "education", label: "Education" },
   { id: "skills", label: "Skills" },
   { id: "projects", label: "Projects" },
-  { id: "tailor", label: "✦ Tailor" },
 ] as const;
 
-type TabId = (typeof tabs)[number]["id"];
+type TabId = (typeof baseTabs)[number]["id"] | "tailor";
 
-export default function ResumeForm() {
+export default function ResumeForm({
+  isVariant = false,
+  resumeId,
+}: {
+  isVariant?: boolean;
+  resumeId?: number;
+}) {
   const [activeTab, setActiveTab] = useState<TabId>("personal");
+
+  const tabs = isVariant
+    ? baseTabs
+    : [...baseTabs, { id: "tailor", label: "✦ Tailor" } as const];
 
   const renderTab = () => {
     switch (activeTab) {
@@ -37,7 +46,9 @@ export default function ResumeForm() {
       case "projects":
         return <ProjectsForm />;
       case "tailor":
-        return <TailorForm />;
+        return <TailorForm isVariant={isVariant} resumeId={resumeId} />;
+      default:
+        return null;
     }
   };
 

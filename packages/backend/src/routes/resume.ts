@@ -507,6 +507,7 @@ router.get("/variants/:id", async (req, res) => {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT 
         id,
+        resume_id,
         job_id AS jobId,
         job_title AS jobTitle,
         company_name AS companyName,
@@ -523,6 +524,7 @@ router.get("/variants/:id", async (req, res) => {
     const variant = rows[0];
     res.json({
       id: variant.id,
+      resumeId: variant.resume_id,
       jobId: variant.jobId,
       jobTitle: variant.jobTitle,
       companyName: variant.companyName,
