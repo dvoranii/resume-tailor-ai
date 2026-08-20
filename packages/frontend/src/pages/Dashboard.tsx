@@ -78,7 +78,11 @@ export default function Dashboard() {
   const deleteResume = async (id: number) => {
     if (
       !confirm(
-        "Delete this resume? (Variants will remain, but the base will be removed.)"
+        "⚠️ Delete this base resume?\n\n" +
+          "• All collections linked to this resume will be permanently deleted.\n" +
+          "• All jobs inside those collections will be deleted.\n" +
+          "• This resume cannot be deleted if it has any variants.\n\n" +
+          "This action cannot be undone."
       )
     )
       return;

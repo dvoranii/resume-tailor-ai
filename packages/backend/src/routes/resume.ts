@@ -15,14 +15,17 @@ router.get("/list", async (_req, res) => {
         r.name, 
         r.summary, 
         r.is_default AS isDefault,
-        r.is_complete AS isComplete, 
+        r.is_complete AS isComplete,
         r.created_at AS createdAt,
         r.updated_at AS updatedAt,
-        COUNT(v.id) AS variantCount
+        COUNT(v.id) AS variantCount,
+        EXISTS (
+          SELECT 1 FROM job_collections c WHERE c.base_resume_id = r.id
+        ) AS hasCollections
       FROM resumes r
       LEFT JOIN resume_variants v ON v.resume_id = r.id
       GROUP BY r.id
-      ORDER BY r.is_default DESC, r.updated_at DESC`
+      ORDER BY r.is_default DESC, r.updated_at DESC;`
     );
     res.json(rows);
   } catch (error) {
@@ -498,6 +501,42 @@ router.patch("/:id/default", async (req, res) => {
     res.status(500).json({ error: "Failed to update default" });
   } finally {
     connection.release();
+  }
+});
+
+// delete resumes
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Check if the resume exists
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM resumes WHERE id = ?",
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    // The foreign key constraints will handle cascading deletes:
+    // - job_collections.base_resume_id ON DELETE CASCADE → deletes collections → deletes jobs → deletes variants
+    // - resume_variants.resume_id has NO ACTION, so if variants exist, the delete will be blocked.
+    // This is desired – you cannot delete a resume that has variants.
+    await pool.query("DELETE FROM resumes WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting resume:", error);
+    // If the error is due to foreign key constraint (variants exist), send a user-friendly message
+    if (
+      error instanceof Error &&
+      error.message.includes("foreign key constraint")
+    ) {
+      return res.status(409).json({
+        error:
+          "Cannot delete this resume because it has variants. Delete the variants first or remove their links to jobs.",
+      });
+    }
+    res.status(500).json({ error: "Failed to delete resume" });
   }
 });
 
