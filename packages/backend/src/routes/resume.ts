@@ -39,10 +39,16 @@ async function fetchFullResumeData(
   resumeId: number
 ) {
   const [resumeRows] = await connection.query<RowDataPacket[]>(
-    "SELECT id, name, summary FROM resumes WHERE id = ?",
+    "SELECT id, name, summary, template_config FROM resumes WHERE id = ?",
     [resumeId]
   );
   if (resumeRows.length === 0) return null;
+
+  const templateConfig = resumeRows[0].template_config
+    ? typeof resumeRows[0].template_config === "string"
+      ? JSON.parse(resumeRows[0].template_config)
+      : resumeRows[0].template_config
+    : null;
 
   const name = resumeRows[0].name || "Untitled";
 
@@ -168,6 +174,7 @@ async function fetchFullResumeData(
 
   return {
     name,
+    templateConfig,
     personal: {
       name: personal.name || "",
       title: personal.title || "",
@@ -450,6 +457,13 @@ router.post("/", async (req, res) => {
       );
     }
 
+    if (req.body.templateConfig) {
+      await connection.query(
+        "UPDATE resumes SET template_config = ? WHERE id = ?",
+        [JSON.stringify(req.body.templateConfig), resumeIdToUse]
+      );
+    }
+
     const complete = isResumeComplete(data);
     await connection.query("UPDATE resumes SET is_complete = ? WHERE id = ?", [
       complete,
@@ -504,6 +518,26 @@ router.patch("/:id/default", async (req, res) => {
   }
 });
 
+router.patch("/:id/template", async (req, res) => {
+  const { id } = req.params;
+  const { templateConfig } = req.body;
+
+  if (!templateConfig) {
+    return res.status(400).json({ error: "templateConfig is required" });
+  }
+
+  try {
+    await pool.query("UPDATE resumes SET template_config = ? WHERE id = ?", [
+      JSON.stringify(templateConfig),
+      id,
+    ]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating resume template config:", error);
+    res.status(500).json({ error: "Failed to update template config" });
+  }
+});
+
 // delete resumes
 
 router.delete("/:id", async (req, res) => {
@@ -552,11 +586,13 @@ router.get("/variants/:id", async (req, res) => {
         company_name AS companyName,
         job_description AS jobDescription,
         tailored_data AS tailoredData,
-        created_at AS createdAt
+        created_at AS createdAt,
+        template_config AS templateConfig
       FROM resume_variants
       WHERE id = ?`,
       [id]
     );
+
     if (rows.length === 0) {
       return res.status(404).json({ error: "Variant not found" });
     }
@@ -573,10 +609,59 @@ router.get("/variants/:id", async (req, res) => {
           ? JSON.parse(variant.tailoredData)
           : variant.tailoredData,
       createdAt: variant.createdAt,
+      templateConfig: variant.templateConfig || null,
     });
   } catch (error) {
     console.error("Error fetching variant:", error);
     res.status(500).json({ error: "Failed to fetch variant" });
+  }
+});
+
+// PUT /api/v1/resume/variants/:id – update variant content and template config
+router.put("/variants/:id", async (req, res) => {
+  const { id } = req.params;
+  const { tailoredData, templateConfig } = req.body;
+
+  if (!tailoredData) {
+    return res.status(400).json({ error: "tailoredData is required" });
+  }
+
+  try {
+    await pool.query(
+      `UPDATE resume_variants 
+       SET tailored_data = ?, template_config = ? 
+       WHERE id = ?`,
+      [
+        JSON.stringify(tailoredData),
+        templateConfig ? JSON.stringify(templateConfig) : null,
+        id,
+      ]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating variant:", error);
+    res.status(500).json({ error: "Failed to update variant" });
+  }
+});
+
+// PATCH /api/v1/resume/variants/:id/template – update only template config
+router.patch("/variants/:id/template", async (req, res) => {
+  const { id } = req.params;
+  const { templateConfig } = req.body;
+
+  if (!templateConfig) {
+    return res.status(400).json({ error: "templateConfig is required" });
+  }
+
+  try {
+    await pool.query(
+      "UPDATE resume_variants SET template_config = ? WHERE id = ?",
+      [JSON.stringify(templateConfig), id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating variant template config:", error);
+    res.status(500).json({ error: "Failed to update template config" });
   }
 });
 

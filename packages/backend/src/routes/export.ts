@@ -1,27 +1,41 @@
 import { Router } from "express";
 import { pool } from "../db";
-import { RowDataPacket } from "mysql2";
+import { RowDataPacket, ResultSetHeader } from "mysql2"; // ✅ Added ResultSetHeader
 import { renderResumeToHtml, generatePdf } from "../services/pdfRenderer";
-import { ResumeSchema } from "@resumeai/shared";
+import { ResumeSchema, defaultTemplateConfig } from "@resumeai/shared";
 import { ZodError, ZodIssue } from "zod";
 
 const router = Router();
 
-router.post("/pdf", async (req, res) => {
+// ============================================================
+// HELPER: Save export record in the database
+// ============================================================
+async function saveExportRecord(
+  resumeId: number | null,
+  variantId: number | null,
+  jobTitle: string | null,
+  companyName: string | null,
+  fileName: string
+): Promise<number> {
+  const [result] = await pool.query<ResultSetHeader>(
+    `INSERT INTO exports (user_id, resume_id, variant_id, job_title, company_name, file_name)
+     VALUES (1, ?, ?, ?, ?, ?)`,
+    [resumeId, variantId, jobTitle, companyName, fileName]
+  );
+  return result.insertId;
+}
+
+// ============================================================
+// HELPER: Fetch full resume data by ID (reused from resume.ts)
+// ============================================================
+async function fetchFullResumeById(resumeId: number) {
   const connection = await pool.getConnection();
-
   try {
-    const { templateConfig } = req.body;
-
     const [resumeRows] = await connection.query<RowDataPacket[]>(
-      "SELECT id, summary FROM resumes LIMIT 1"
+      "SELECT id, summary FROM resumes WHERE id = ?",
+      [resumeId]
     );
-
-    if (resumeRows.length === 0) {
-      return res.status(404).json({ error: "No resume found" });
-    }
-
-    const resumeId = resumeRows[0].id;
+    if (resumeRows.length === 0) return null;
 
     const [personalRows] = await connection.query<RowDataPacket[]>(
       "SELECT * FROM personal_info WHERE resume_id = ?",
@@ -125,7 +139,7 @@ router.post("/pdf", async (req, res) => {
     }));
 
     const personal = personalRows[0];
-    const resumeData = {
+    return {
       personal: {
         name: personal.name || "",
         title: personal.title || "",
@@ -142,48 +156,153 @@ router.post("/pdf", async (req, res) => {
       projects,
       education,
     };
-
-    const validated = ResumeSchema.safeParse(resumeData);
-    if (!validated.success) {
-      const zodError = validated.error as unknown as ZodError;
-      const details = zodError.errors.map((e: ZodIssue) => e.message);
-      return res.status(422).json({ error: "Resume is incomplete", details });
-    }
-
-    const html = renderResumeToHtml(validated.data, templateConfig);
-    const pdf = await generatePdf(html);
-
-    const name = personal.name ? personal.name.replace(/\s+/g, "_") : "resume";
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${name}_resume.pdf"`
-    );
-    res.send(pdf);
-  } catch (error) {
-    console.error("PDF export error:", error);
-    res.status(500).json({ error: "Failed to generate PDF" });
   } finally {
     connection.release();
   }
+}
+
+// ============================================================
+// POST /api/v1/export/pdf
+// Export base resume (or variant) and save export record
+// ============================================================
+router.post("/pdf", async (req, res) => {
+  const { templateConfig, resumeId, variantId } = req.body;
+
+  let resumeData = null;
+  let actualResumeId: number | null = null;
+  let actualVariantId: number | null = null;
+  let jobTitle: string | null = null;
+  let companyName: string | null = null;
+
+  // 1. Determine which resume to export
+  if (variantId) {
+    // Fetch variant data
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query<RowDataPacket[]>(
+        "SELECT resume_id, job_title, company_name, tailored_data FROM resume_variants WHERE id = ?",
+        [variantId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Variant not found" });
+      }
+      const variant = rows[0];
+      actualResumeId = variant.resume_id;
+      actualVariantId = Number(variantId);
+      jobTitle = variant.job_title;
+      companyName = variant.company_name;
+      resumeData =
+        typeof variant.tailored_data === "string"
+          ? JSON.parse(variant.tailored_data)
+          : variant.tailored_data;
+    } finally {
+      connection.release();
+    }
+  } else if (resumeId) {
+    // Fetch base resume by ID
+    resumeData = await fetchFullResumeById(Number(resumeId));
+    if (!resumeData) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+    actualResumeId = Number(resumeId);
+  } else {
+    // Fallback: fetch default resume (first one)
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query<RowDataPacket[]>(
+        "SELECT id FROM resumes LIMIT 1"
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "No resume found" });
+      }
+      resumeData = await fetchFullResumeById(rows[0].id);
+      if (!resumeData) {
+        return res.status(404).json({ error: "Resume data not found" });
+      }
+      actualResumeId = rows[0].id;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // 2. Validate the resume data with Zod
+  const validated = ResumeSchema.safeParse(resumeData);
+  if (!validated.success) {
+    const zodError = validated.error as unknown as ZodError;
+    const details = zodError.errors.map((e: ZodIssue) => e.message);
+    return res.status(422).json({ error: "Resume is incomplete", details });
+  }
+
+  // 3. Generate PDF
+  const html = renderResumeToHtml(validated.data, templateConfig);
+  const pdf = await generatePdf(html);
+
+  // 4. Save export record
+  const fileName = `resume_${Date.now()}.pdf`;
+  const exportId = await saveExportRecord(
+    actualResumeId,
+    actualVariantId,
+    jobTitle,
+    companyName,
+    fileName
+  );
+
+  // 5. Send PDF to the client
+  const name = resumeData.personal?.name?.replace(/\s+/g, "_") || "resume";
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${name}_resume.pdf"`
+  );
+  res.send(pdf);
 });
 
+// ============================================================
+// POST /api/v1/export/pdf/variant/:id
+// Export a variant by its ID and save export record
+// ============================================================
 router.post("/pdf/variant/:id", async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const [rows] = await connection.query<RowDataPacket[]>(
-      "SELECT * FROM resume_variants WHERE id = ?",
+      "SELECT resume_id, job_title, company_name, tailored_data FROM resume_variants WHERE id = ?",
       [req.params.id]
     );
-    if (rows.length === 0)
+    if (rows.length === 0) {
       return res.status(404).json({ error: "Variant not found" });
+    }
+
     const variant = rows[0];
     const resumeData =
       typeof variant.tailored_data === "string"
         ? JSON.parse(variant.tailored_data)
         : variant.tailored_data;
-    const html = renderResumeToHtml(resumeData);
+
+    // Validate and generate PDF
+    const validated = ResumeSchema.safeParse(resumeData);
+    if (!validated.success) {
+      const zodError = validated.error as unknown as ZodError;
+      const details = zodError.errors.map((e: ZodIssue) => e.message);
+      return res
+        .status(422)
+        .json({ error: "Variant resume data is invalid", details });
+    }
+
+    const html = renderResumeToHtml(
+      validated.data,
+      req.body.templateConfig || {}
+    );
     const pdf = await generatePdf(html);
+
+    const fileName = `tailored_${Date.now()}.pdf`;
+    await saveExportRecord(
+      variant.resume_id,
+      Number(req.params.id),
+      variant.job_title,
+      variant.company_name,
+      fileName
+    );
+
     const filename =
       [variant.company_name, variant.job_title]
         .filter(Boolean)
@@ -196,9 +315,117 @@ router.post("/pdf/variant/:id", async (req, res) => {
     );
     res.send(pdf);
   } catch (error) {
+    console.error("Variant export error:", error);
     res.status(500).json({ error: "Failed to export variant PDF" });
   } finally {
     connection.release();
+  }
+});
+
+// ============================================================
+// GET /api/v1/export/exports
+// List all exports with optional search (job title / company)
+// ============================================================
+router.get("/exports", async (req, res) => {
+  const { search } = req.query;
+  let query = `
+    SELECT id, resume_id, variant_id, job_title, company_name, file_name, created_at
+    FROM exports
+    WHERE user_id = 1
+  `;
+  const params: any[] = [];
+
+  if (search && typeof search === "string" && search.trim()) {
+    const like = `%${search.trim()}%`;
+    query += ` AND (job_title LIKE ? OR company_name LIKE ?)`;
+    params.push(like, like);
+  }
+
+  query += ` ORDER BY created_at DESC`;
+
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching exports:", error);
+    res.status(500).json({ error: "Failed to fetch exports" });
+  }
+});
+
+// ============================================================
+// GET /api/v1/export/exports/:id/download
+// Re-download a previously exported PDF
+// ============================================================
+router.get("/exports/:id/download", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Fetch the export record
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT resume_id, variant_id, file_name FROM exports WHERE id = ? AND user_id = 1`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Export not found" });
+    }
+    const exportRecord = rows[0];
+
+    let pdfBuffer: Buffer;
+    let filename: string;
+
+    // 2. Generate PDF based on the export record
+    if (exportRecord.variant_id) {
+      // Variant export
+      const [variantRows] = await pool.query<RowDataPacket[]>(
+        "SELECT job_title, company_name, tailored_data FROM resume_variants WHERE id = ?",
+        [exportRecord.variant_id]
+      );
+      if (variantRows.length === 0) {
+        return res.status(404).json({ error: "Variant not found" });
+      }
+      const variant = variantRows[0];
+      const resumeData =
+        typeof variant.tailored_data === "string"
+          ? JSON.parse(variant.tailored_data)
+          : variant.tailored_data;
+      const validated = ResumeSchema.safeParse(resumeData);
+      if (!validated.success) {
+        return res.status(422).json({ error: "Variant data is invalid" });
+      }
+      const html = renderResumeToHtml(validated.data, defaultTemplateConfig);
+      pdfBuffer = await generatePdf(html);
+      filename =
+        [variant.company_name, variant.job_title]
+          .filter(Boolean)
+          .join("_")
+          .replace(/\s+/g, "_") || "tailored_resume";
+    } else if (exportRecord.resume_id) {
+      // Base resume export
+      const resumeData = await fetchFullResumeById(exportRecord.resume_id);
+      if (!resumeData) {
+        return res.status(404).json({ error: "Resume not found" });
+      }
+      const validated = ResumeSchema.safeParse(resumeData);
+      if (!validated.success) {
+        return res.status(422).json({ error: "Resume data is invalid" });
+      }
+      const html = renderResumeToHtml(validated.data, defaultTemplateConfig);
+      pdfBuffer = await generatePdf(html);
+      filename = resumeData.personal?.name?.replace(/\s+/g, "_") || "resume";
+    } else {
+      return res.status(400).json({ error: "Invalid export record" });
+    }
+
+    // 3. Send the PDF
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}.pdf"`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Download error:", error);
+    res.status(500).json({ error: "Failed to download export" });
   }
 });
 

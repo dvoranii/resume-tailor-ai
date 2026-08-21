@@ -145,7 +145,8 @@ async function fetchMasterResume(
 }
 
 router.post("/", async (req, res) => {
-  const { jobDescription, jobTitle, companyName, jobId } = req.body;
+  const { jobDescription, jobTitle, companyName, jobId, templateConfig } =
+    req.body;
 
   if (!jobDescription?.trim()) {
     return res.status(400).json({ error: "Job description is required" });
@@ -220,16 +221,22 @@ ${jobDescription}`;
       if (existing.length > 0) {
         // ✅ Update existing variant
         await connection.query(
-          `UPDATE resume_variants SET tailored_data = ? WHERE id = ?`,
-          [JSON.stringify(validated.data), existing[0].id]
+          `UPDATE resume_variants 
+            SET tailored_data = ?, template_config = ? 
+            WHERE id = ?`,
+          [
+            JSON.stringify(validated.data),
+            templateConfig ? JSON.stringify(templateConfig) : null,
+            existing[0].id,
+          ]
         );
         variantId = existing[0].id;
       } else {
         // ✅ Insert new variant with job_id
         const [result] = await connection.query<ResultSetHeader>(
           `INSERT INTO resume_variants 
-            (resume_id, job_id, job_title, company_name, job_description, tailored_data)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+            (resume_id, job_id, job_title, company_name, job_description, tailored_data, template_config)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             resumeId,
             jobId,
@@ -237,6 +244,7 @@ ${jobDescription}`;
             companyName || "",
             jobDescription,
             JSON.stringify(validated.data),
+            templateConfig ? JSON.stringify(templateConfig) : null,
           ]
         );
         variantId = result.insertId;
@@ -245,14 +253,15 @@ ${jobDescription}`;
       // ✅ No jobId provided – insert as standalone variant (job_id = NULL)
       const [result] = await connection.query<ResultSetHeader>(
         `INSERT INTO resume_variants 
-          (resume_id, job_title, company_name, job_description, tailored_data)
-         VALUES (?, ?, ?, ?, ?)`,
+          (resume_id, job_title, company_name, job_description, tailored_data, template_config)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
           resumeId,
           jobTitle || "",
           companyName || "",
           jobDescription,
           JSON.stringify(validated.data),
+          templateConfig ? JSON.stringify(templateConfig) : null,
         ]
       );
       variantId = result.insertId;

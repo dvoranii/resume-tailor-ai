@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { API_BASE } from "../../../types/jobs";
+import { useResumeBuilder } from "../../../context/ResumeBuilderContext";
 
 interface Job {
   id: number;
@@ -20,6 +21,8 @@ export default function TailorForm({ resumeId }: { resumeId?: number }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const { templateConfig } = useResumeBuilder();
 
   // Fetch jobs only if resumeId is provided
   useEffect(() => {
@@ -63,6 +66,7 @@ export default function TailorForm({ resumeId }: { resumeId?: number }) {
           companyName: selectedJob.companyName,
           jobDescription,
           jobId: selectedJob.id,
+          templateConfig,
         }),
       });
 

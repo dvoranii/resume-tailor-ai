@@ -49,11 +49,13 @@ interface ResumeBuilderContextType {
   saveResume: (resume: Resume) => Promise<void>;
   loadResume: (id?: number | null) => Promise<void>;
   loadVariant: (variantId: number) => Promise<void>;
-  saveAsNew: (name: string, isDefault: boolean) => Promise<number>;
+  // saveAsNew: (name: string, isDefault: boolean) => Promise<number>;
   exportPdf: () => Promise<void>;
   templateConfig: TemplateConfig;
   updateTemplateConfig: (config: TemplateConfig) => void;
-  saveTemplateConfig: () => Promise<void>;
+  // saveTemplateConfig is no longer used (replaced by per‑entity save)
+  currentResumeId: number | null;
+  currentVariantId: number | null;
 }
 
 const ResumeBuilderContext = createContext<ResumeBuilderContextType | null>(
@@ -99,6 +101,7 @@ export function ResumeBuilderProvider({
     setBaseResumeIdForVariant(null);
   }, []);
 
+  // Fetch base resume data
   const fetchResumeData = useCallback(
     async (id?: number | null) => {
       setIsLoading(true);
@@ -128,7 +131,14 @@ export function ResumeBuilderProvider({
         setCurrentResumeId(id || null);
         setResumeName(data.name || "Untitled");
 
-        // Fetch name from list
+        // ✅ Set template config from response
+        if (data.templateConfig) {
+          setTemplateConfig(data.templateConfig);
+        } else {
+          setTemplateConfig(defaultTemplateConfig);
+        }
+
+        // Fetch name from list (to get display name)
         const listRes = await fetch(`${API_BASE}/resumes/list`);
         if (listRes.ok) {
           const list = await listRes.json();
@@ -158,6 +168,7 @@ export function ResumeBuilderProvider({
     [fetchResumeData]
   );
 
+  // Load variant
   const loadVariant = useCallback(async (variantId: number) => {
     setIsLoading(true);
     try {
@@ -170,6 +181,12 @@ export function ResumeBuilderProvider({
       setVariantJobTitle(data.jobTitle || "");
       setVariantCompany(data.companyName || "");
       setResumeName(`${data.jobTitle} at ${data.companyName} (Tailored)`);
+      // ✅ Set template config from variant
+      if (data.templateConfig) {
+        setTemplateConfig(data.templateConfig);
+      } else {
+        setTemplateConfig(defaultTemplateConfig);
+      }
       setCurrentResumeId(null);
       setBaseResumeIdForVariant(data.resumeId || null);
     } catch (error) {
@@ -180,19 +197,30 @@ export function ResumeBuilderProvider({
     }
   }, []);
 
-  const saveVariant = useCallback(async (variantId: number, data: Resume) => {
-    try {
-      const response = await fetch(`${API_BASE}/resume/variants/${variantId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tailoredData: data }),
-      });
-      if (!response.ok) throw new Error("Failed to save variant");
-    } catch (error) {
-      console.error("Error saving variant:", error);
-    }
-  }, []);
+  // Save variant (content only)
+  const saveVariant = useCallback(
+    async (variantId: number, data: Resume) => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/resume/variants/${variantId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tailoredData: data,
+              templateConfig: templateConfig, // ✅ also send current template config
+            }),
+          }
+        );
+        if (!response.ok) throw new Error("Failed to save variant");
+      } catch (error) {
+        console.error("Error saving variant:", error);
+      }
+    },
+    [templateConfig]
+  );
 
+  // Save base resume (content only)
   const saveResume = useCallback(
     async (latestResume: Resume) => {
       if (isVariant && currentVariantId) {
@@ -210,6 +238,7 @@ export function ResumeBuilderProvider({
           resumeId: currentResumeId,
           name: resumeName,
           isDefault: false,
+          templateConfig: templateConfig, // ✅ include template config
         };
 
         const response = await fetch(`${API_BASE}/resume`, {
@@ -225,7 +254,14 @@ export function ResumeBuilderProvider({
         console.error("Error saving resume:", error);
       }
     },
-    [currentResumeId, resumeName, isVariant, currentVariantId, saveVariant]
+    [
+      currentResumeId,
+      resumeName,
+      isVariant,
+      currentVariantId,
+      saveVariant,
+      templateConfig,
+    ]
   );
 
   const debouncedSave = (latestResume: Resume) => {
@@ -254,39 +290,58 @@ export function ResumeBuilderProvider({
   const updateEducation = (education: Resume["education"]) =>
     updateField("education", education);
 
-  const saveAsNew = useCallback(
-    async (name: string, isDefault: boolean): Promise<number> => {
-      try {
-        const payload = {
-          ...resume,
-          name,
-          isDefault,
-        };
-        const response = await fetch(`${API_BASE}/resume`, {
-          method: "POST",
+  // ============================================================
+  // Template Config Persistence (per resume / variant)
+  // ============================================================
+
+  // Save template config to the current entity (base or variant)
+  const saveTemplateConfigToCurrentEntity = useCallback(
+    async (config: TemplateConfig) => {
+      if (isVariant && currentVariantId) {
+        await fetch(
+          `${API_BASE}/resume/variants/${currentVariantId}/template`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ templateConfig: config }),
+          }
+        );
+      } else if (currentResumeId) {
+        await fetch(`${API_BASE}/resume/${currentResumeId}/template`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ templateConfig: config }),
         });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to save as new");
-        }
-        const data = await response.json();
-        return data.id;
-      } catch (error) {
-        console.error("Error saving as new:", error);
-        alert("Failed to save as new resume.");
-        throw error;
       }
     },
-    [resume]
+    [isVariant, currentVariantId, currentResumeId]
   );
 
+  // Update template config (called from UI) – saves locally and persists
+  const updateTemplateConfig = (config: TemplateConfig) => {
+    setTemplateConfig(config);
+    // Debounce save to avoid too many requests
+    if (configSaveTimeout) clearTimeout(configSaveTimeout);
+    const timeout = window.setTimeout(() => {
+      saveTemplateConfigToCurrentEntity(config);
+    }, 800);
+    setConfigSaveTimeout(timeout);
+  };
+
+  // Export PDF
   const exportPdf = async () => {
+    const payload: any = { templateConfig };
+    if (currentResumeId) {
+      payload.resumeId = currentResumeId;
+    }
+    if (currentVariantId) {
+      payload.variantId = currentVariantId;
+    }
+
     const response = await fetch(`${API_BASE}/export/pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ templateConfig }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       const err = await response.json();
@@ -301,37 +356,18 @@ export function ResumeBuilderProvider({
     URL.revokeObjectURL(url);
   };
 
+  // The old global save functions are no longer used – kept for reference (commented out)
+  /*
   const saveTemplateConfigToServer = async (latestConfig: TemplateConfig) => {
-    try {
-      const response = await fetch(`${API_BASE}/template-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(latestConfig),
-      });
-      if (!response.ok) {
-        console.error("Failed to save template config:", response.status);
-      }
-    } catch (error) {
-      console.error("Error saving template config:", error);
-    }
+    // deprecated
   };
-
   const debouncedSaveTemplateConfig = (latestConfig: TemplateConfig) => {
-    if (configSaveTimeout) clearTimeout(configSaveTimeout);
-    const timeout = window.setTimeout(() => {
-      saveTemplateConfigToServer(latestConfig);
-    }, 800);
-    setConfigSaveTimeout(timeout);
+    // deprecated
   };
-
-  const updateTemplateConfig = (config: TemplateConfig) => {
-    setTemplateConfig(config);
-    debouncedSaveTemplateConfig(config);
-  };
-
   const saveTemplateConfig = async () => {
-    await saveTemplateConfigToServer(templateConfig);
+    // deprecated
   };
+  */
 
   return (
     <ResumeBuilderContext.Provider
@@ -352,11 +388,13 @@ export function ResumeBuilderProvider({
         saveResume,
         loadResume,
         loadVariant,
-        saveAsNew,
+        // saveAsNew,
         exportPdf,
         templateConfig,
         updateTemplateConfig,
-        saveTemplateConfig,
+        // saveTemplateConfig, // removed – no longer used
+        currentResumeId,
+        currentVariantId,
       }}
     >
       {children}
