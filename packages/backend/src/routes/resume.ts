@@ -307,7 +307,6 @@ router.post("/", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // If this resume is to be the default, unset all others
     if (isDefault) {
       await connection.query(
         "UPDATE resumes SET is_default = FALSE WHERE is_default = TRUE"
@@ -317,14 +316,11 @@ router.post("/", async (req, res) => {
     let resumeIdToUse: number;
 
     if (resumeId) {
-      // ✅ Update existing resume
       await connection.query(
         "UPDATE resumes SET summary = ?, name = ?, is_default = ? WHERE id = ?",
         [data.summary || "", name || "My Resume", isDefault || false, resumeId]
       );
       resumeIdToUse = resumeId;
-
-      // Delete existing related sections
       await connection.query("DELETE FROM personal_info WHERE resume_id = ?", [
         resumeId,
       ]);
@@ -343,7 +339,6 @@ router.post("/", async (req, res) => {
         resumeId,
       ]);
     } else {
-      // ✅ Create new resume
       const [result] = await connection.query<ResultSetHeader>(
         "INSERT INTO resumes (summary, name, is_default) VALUES (?, ?, ?)",
         [data.summary || "", name || "My Resume", isDefault || false]
@@ -543,7 +538,6 @@ router.patch("/:id/template", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    // Check if the resume exists
     const [rows] = await pool.query<RowDataPacket[]>(
       "SELECT id FROM resumes WHERE id = ?",
       [id]
@@ -551,16 +545,11 @@ router.delete("/:id", async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: "Resume not found" });
     }
-
-    // The foreign key constraints will handle cascading deletes:
-    // - job_collections.base_resume_id ON DELETE CASCADE → deletes collections → deletes jobs → deletes variants
-    // - resume_variants.resume_id has NO ACTION, so if variants exist, the delete will be blocked.
-    // This is desired – you cannot delete a resume that has variants.
     await pool.query("DELETE FROM resumes WHERE id = ?", [id]);
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting resume:", error);
-    // If the error is due to foreign key constraint (variants exist), send a user-friendly message
+
     if (
       error instanceof Error &&
       error.message.includes("foreign key constraint")
@@ -617,7 +606,6 @@ router.get("/variants/:id", async (req, res) => {
   }
 });
 
-// PUT /api/v1/resume/variants/:id – update variant content and template config
 router.put("/variants/:id", async (req, res) => {
   const { id } = req.params;
   const { tailoredData, templateConfig } = req.body;
@@ -644,7 +632,6 @@ router.put("/variants/:id", async (req, res) => {
   }
 });
 
-// PATCH /api/v1/resume/variants/:id/template – update only template config
 router.patch("/variants/:id/template", async (req, res) => {
   const { id } = req.params;
   const { templateConfig } = req.body;
