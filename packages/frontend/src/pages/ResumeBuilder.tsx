@@ -9,6 +9,9 @@ import ResumeForm from "../components/resume/ResumeForm";
 import ResumePreview from "../components/resume/ResumePreview";
 import TemplateConfigPanel from "../components/resume/TemplateConfigPanel";
 
+import type { Resume } from "@resumeai/shared";
+import DiffModal from "../components/diff/DiffModal";
+
 import {
   clearActiveResumeId,
   getActiveResumeId,
@@ -18,6 +21,7 @@ import {
   clearActiveVariantId,
   clearActiveState,
 } from "../utils/activeResume";
+import { API_BASE } from "../types/jobs";
 
 function ResumeBuilderContent() {
   const {
@@ -39,6 +43,14 @@ function ResumeBuilderContent() {
   const resumeId = searchParams.get("id");
   const variantId = searchParams.get("variantId");
   const isNew = searchParams.get("new") === "true";
+  const showDiffParam = searchParams.get("showDiff") === "true";
+
+  const [showDiffModal, setShowDiffModal] = useState(false);
+  const [diffData, setDiffData] = useState<{
+    original: Resume;
+    tailored: Resume;
+  } | null>(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
 
   const navigate = useNavigate();
 
@@ -81,6 +93,24 @@ function ResumeBuilderContent() {
     }
   }, [isVariant, baseResumeIdForVariant, variantId, navigate, searchParams]);
 
+  useEffect(() => {
+    if (showDiffParam && isVariant && variantId && !showDiffModal) {
+      handleViewChanges();
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("showDiff");
+      navigate(`${window.location.pathname}?${newParams.toString()}`, {
+        replace: true,
+      });
+    }
+  }, [
+    showDiffParam,
+    isVariant,
+    variantId,
+    showDiffModal,
+    navigate,
+    searchParams,
+  ]);
+
   const handleExport = async () => {
     setExporting(true);
     setError(null);
@@ -116,62 +146,111 @@ function ResumeBuilderContent() {
     }
   };
 
+  const handleViewChanges = async () => {
+    if (!variantId) return;
+    setLoadingDiff(true);
+    try {
+      const variantRes = await fetch(
+        `${API_BASE}/resume/variants/${variantId}`
+      );
+      const variantData = await variantRes.json();
+      const baseResumeId = variantData.resumeId;
+      if (!baseResumeId) {
+        alert("Could not find base resume for this variant.");
+        return;
+      }
+      const originalRes = await fetch(`${API_BASE}/resume?id=${baseResumeId}`);
+      const originalData = await originalRes.json();
+      setDiffData({
+        original: originalData,
+        tailored: variantData.tailoredData,
+      });
+      setShowDiffModal(true);
+    } catch (error) {
+      console.error("Failed to load diff:", error);
+      alert("Failed to load changes.");
+    } finally {
+      setLoadingDiff(false);
+    }
+  };
+
   const headerTitle = isVariant
     ? `Variant: ${variantJobTitle} at ${variantCompany}`
     : resumeName || "Untitled";
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-sm text-text-muted">
-          <span>Resume Builder</span>
-          <span>/</span>
-          <span className="text-text-primary">
-            {isLoading ? "Loading..." : headerTitle}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {error && <span className="text-red-400 text-xs">{error}</span>}
+    <>
+      <div className="flex flex-col h-full gap-4">
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <span>Resume Builder</span>
+            <span>/</span>
+            <span className="text-text-primary">
+              {isLoading ? "Loading..." : headerTitle}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {error && <span className="text-red-400 text-xs">{error}</span>}
 
-          {isVariant && (
+            {isVariant && (
+              <>
+                <button
+                  onClick={() => handleBackToVariants()}
+                  className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm px-3 py-2 rounded-md transition-colors"
+                >
+                  <ArrowLeft size={15} />
+                  Back to Variants
+                </button>
+                <button
+                  onClick={handleViewChanges}
+                  disabled={loadingDiff}
+                  className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm px-3 py-2 rounded-md transition-colors"
+                >
+                  {loadingDiff ? "Loading..." : "View Changes"}
+                </button>
+              </>
+            )}
+
             <button
-              onClick={() => handleBackToVariants()}
-              className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm px-3 py-2 rounded-md transition-colors"
+              onClick={handleSaveAsNew}
+              className="flex items-center gap-1.5 bg-accent/20 hover:bg-accent/30 text-accent text-sm px-3 py-2 rounded-md transition-colors"
             >
-              <ArrowLeft size={15} />
-              Back to Variants
+              Save as New
             </button>
-          )}
 
-          <button
-            onClick={handleSaveAsNew}
-            className="flex items-center gap-1.5 bg-accent/20 hover:bg-accent/30 text-accent text-sm px-3 py-2 rounded-md transition-colors"
-          >
-            Save as New
-          </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm px-3 py-2 rounded-md transition-colors"
+            >
+              <Download size={15} />
+              {exporting ? "Generating..." : "Export PDF"}
+            </button>
+          </div>
+        </div>
 
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm px-3 py-2 rounded-md transition-colors"
-          >
-            <Download size={15} />
-            {exporting ? "Generating..." : "Export PDF"}
-          </button>
+        <div className="flex flex-1 gap-6 min-h-0">
+          <ResumeForm
+            isVariant={isVariant}
+            resumeId={resumeId ? Number(resumeId) : undefined}
+          />
+          <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
+            <TemplateConfigPanel />
+            <ResumePreview />
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 min-h-0">
-        <ResumeForm
-          isVariant={isVariant}
-          resumeId={resumeId ? Number(resumeId) : undefined}
+      {showDiffModal && diffData && (
+        <DiffModal
+          original={diffData.original}
+          tailored={diffData.tailored}
+          jobTitle={variantJobTitle}
+          companyName={variantCompany}
+          onClose={() => setShowDiffModal(false)}
         />
-        <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
-          <TemplateConfigPanel />
-          <ResumePreview />
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 

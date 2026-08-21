@@ -46,7 +46,8 @@ export default function ResumeForm({
       case "projects":
         return <ProjectsForm />;
       case "tailor":
-        return <TailorForm isVariant={isVariant} resumeId={resumeId} />;
+        if (isVariant) return null;
+        return <TailorForm resumeId={resumeId} />;
       default:
         return null;
     }

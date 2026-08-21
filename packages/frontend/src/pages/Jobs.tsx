@@ -3,7 +3,7 @@ import { API_BASE, type Job, type Collection } from "../types/jobs";
 import AddJobForm from "../components/jobs/AddJobForm";
 import NewCollectionForm from "../components/jobs/NewCollectionForm";
 import CollectionCard from "../components/jobs/CollectionCard";
-import JobCard from "../components/jobs/JobCard";
+import { JobCard } from "../components/diff";
 
 export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
