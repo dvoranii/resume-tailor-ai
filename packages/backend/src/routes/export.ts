@@ -1,15 +1,12 @@
 import { Router } from "express";
 import { pool } from "../db";
-import { RowDataPacket, ResultSetHeader } from "mysql2"; // ✅ Added ResultSetHeader
+import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { renderResumeToHtml, generatePdf } from "../services/pdfRenderer";
 import { ResumeSchema, defaultTemplateConfig } from "@resumeai/shared";
 import { ZodError, ZodIssue } from "zod";
 
 const router = Router();
 
-// ============================================================
-// HELPER: Save export record in the database
-// ============================================================
 async function saveExportRecord(
   resumeId: number | null,
   variantId: number | null,
@@ -25,9 +22,6 @@ async function saveExportRecord(
   return result.insertId;
 }
 
-// ============================================================
-// HELPER: Fetch full resume data by ID (reused from resume.ts)
-// ============================================================
 async function fetchFullResumeById(resumeId: number) {
   const connection = await pool.getConnection();
   try {
@@ -161,10 +155,6 @@ async function fetchFullResumeById(resumeId: number) {
   }
 }
 
-// ============================================================
-// POST /api/v1/export/pdf
-// Export base resume (or variant) and save export record
-// ============================================================
 router.post("/pdf", async (req, res) => {
   const { templateConfig, resumeId, variantId } = req.body;
 
@@ -174,9 +164,7 @@ router.post("/pdf", async (req, res) => {
   let jobTitle: string | null = null;
   let companyName: string | null = null;
 
-  // 1. Determine which resume to export
   if (variantId) {
-    // Fetch variant data
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.query<RowDataPacket[]>(
@@ -199,14 +187,12 @@ router.post("/pdf", async (req, res) => {
       connection.release();
     }
   } else if (resumeId) {
-    // Fetch base resume by ID
     resumeData = await fetchFullResumeById(Number(resumeId));
     if (!resumeData) {
       return res.status(404).json({ error: "Resume not found" });
     }
     actualResumeId = Number(resumeId);
   } else {
-    // Fallback: fetch default resume (first one)
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.query<RowDataPacket[]>(
@@ -225,7 +211,6 @@ router.post("/pdf", async (req, res) => {
     }
   }
 
-  // 2. Validate the resume data with Zod
   const validated = ResumeSchema.safeParse(resumeData);
   if (!validated.success) {
     const zodError = validated.error as unknown as ZodError;
@@ -233,11 +218,9 @@ router.post("/pdf", async (req, res) => {
     return res.status(422).json({ error: "Resume is incomplete", details });
   }
 
-  // 3. Generate PDF
   const html = renderResumeToHtml(validated.data, templateConfig);
   const pdf = await generatePdf(html);
 
-  // 4. Save export record
   const fileName = `resume_${Date.now()}.pdf`;
   const exportId = await saveExportRecord(
     actualResumeId,
@@ -247,7 +230,6 @@ router.post("/pdf", async (req, res) => {
     fileName
   );
 
-  // 5. Send PDF to the client
   const name = resumeData.personal?.name?.replace(/\s+/g, "_") || "resume";
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
@@ -257,10 +239,6 @@ router.post("/pdf", async (req, res) => {
   res.send(pdf);
 });
 
-// ============================================================
-// POST /api/v1/export/pdf/variant/:id
-// Export a variant by its ID and save export record
-// ============================================================
 router.post("/pdf/variant/:id", async (req, res) => {
   const connection = await pool.getConnection();
   try {
@@ -278,7 +256,6 @@ router.post("/pdf/variant/:id", async (req, res) => {
         ? JSON.parse(variant.tailored_data)
         : variant.tailored_data;
 
-    // Validate and generate PDF
     const validated = ResumeSchema.safeParse(resumeData);
     if (!validated.success) {
       const zodError = validated.error as unknown as ZodError;
@@ -322,10 +299,6 @@ router.post("/pdf/variant/:id", async (req, res) => {
   }
 });
 
-// ============================================================
-// GET /api/v1/export/exports
-// List all exports with optional search (job title / company)
-// ============================================================
 router.get("/exports", async (req, res) => {
   const { search } = req.query;
   let query = `
@@ -352,15 +325,10 @@ router.get("/exports", async (req, res) => {
   }
 });
 
-// ============================================================
-// GET /api/v1/export/exports/:id/download
-// Re-download a previously exported PDF
-// ============================================================
 router.get("/exports/:id/download", async (req, res) => {
   const { id } = req.params;
 
   try {
-    // 1. Fetch the export record
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT resume_id, variant_id, file_name FROM exports WHERE id = ? AND user_id = 1`,
       [id]
@@ -373,9 +341,7 @@ router.get("/exports/:id/download", async (req, res) => {
     let pdfBuffer: Buffer;
     let filename: string;
 
-    // 2. Generate PDF based on the export record
     if (exportRecord.variant_id) {
-      // Variant export
       const [variantRows] = await pool.query<RowDataPacket[]>(
         "SELECT job_title, company_name, tailored_data FROM resume_variants WHERE id = ?",
         [exportRecord.variant_id]
@@ -400,7 +366,6 @@ router.get("/exports/:id/download", async (req, res) => {
           .join("_")
           .replace(/\s+/g, "_") || "tailored_resume";
     } else if (exportRecord.resume_id) {
-      // Base resume export
       const resumeData = await fetchFullResumeById(exportRecord.resume_id);
       if (!resumeData) {
         return res.status(404).json({ error: "Resume not found" });
@@ -416,7 +381,6 @@ router.get("/exports/:id/download", async (req, res) => {
       return res.status(400).json({ error: "Invalid export record" });
     }
 
-    // 3. Send the PDF
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",

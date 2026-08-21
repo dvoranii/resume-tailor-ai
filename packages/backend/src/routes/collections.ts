@@ -11,7 +11,6 @@ import {
 const router = Router();
 const MIN_ITEMS = 10;
 
-// POST /api/v1/collections
 router.post("/", async (req, res) => {
   const { name, searchQuery, location, filters, maxItems, baseResumeId } =
     req.body;
@@ -49,7 +48,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/v1/collections
 router.get("/", async (_req, res) => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -71,7 +69,6 @@ router.get("/", async (_req, res) => {
   }
 });
 
-// GET /api/v1/collections/:id
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -100,7 +97,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// POST /api/v1/collections/:id/scrape
 router.post("/:id/scrape", async (req, res) => {
   const { id } = req.params;
   try {
@@ -198,7 +194,6 @@ router.post("/:id/scrape", async (req, res) => {
   }
 });
 
-// DELETE /api/v1/collections/:id
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   try {

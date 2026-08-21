@@ -77,8 +77,6 @@ router.get("/:provider", async (req, res) => {
   }
 });
 
-// DELETE /api/v1/api-keys/:provider
-// Delete an API key (optional, for security)
 router.delete("/:provider", async (req, res) => {
   const { provider } = req.params;
 

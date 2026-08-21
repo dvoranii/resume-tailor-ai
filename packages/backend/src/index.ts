@@ -15,10 +15,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configure CORS to allow your frontend
 app.use(
   cors({
-    origin: "http://localhost:5173", // your Vite frontend URL
+    origin: "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -27,7 +26,6 @@ app.use(
 
 app.use(express.json());
 
-// Register routes
 app.use("/api/v1/resume", resumeRoutes);
 app.use("/api/v1/export", exportRouter);
 app.use("/api/v1/tailor", tailorRouter);
@@ -37,7 +35,6 @@ app.use("/api/v1/api-keys", apiKeysRoutes);
 app.use("/api/v1/test-apify", testApifyRoutes);
 app.use("/api/v1/collections", collectionsRoutes);
 
-// Health check
 app.get("/api/v1/health", (_req, res) => {
   res.json({ status: "ok" });
 });

@@ -4,8 +4,6 @@ import { buildLinkedInUrl } from "../utils/linkedinUrlBuilder";
 
 const router = Router();
 
-// GET /api/v1/test-apify
-// Test the Apify integration with a simple scrape
 router.get("/", async (req, res) => {
   const { keywords, location, maxItems } = req.query;
 
@@ -17,7 +15,6 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    // 1. Get the API key from the database
     const apiKey = await ApifyService.getApiKey();
     if (!apiKey) {
       return res
@@ -25,22 +22,18 @@ router.get("/", async (req, res) => {
         .json({ error: "Apify API key not configured. Please save it first." });
     }
 
-    // 2. Build the LinkedIn URL
     const url = buildLinkedInUrl(
       keywords as string,
       (location as string) || "",
       { timeRange: "7d", sortBy: "recent" }
     );
-    console.log(`[Test] Built URL: ${url}`);
+    // console.log(`[Test] Built URL: ${url}`);
 
-    // 3. Initialize Apify service
     const apifyService = new ApifyService(apiKey);
 
-    // 4. Scrape jobs
     const max = maxItems ? parseInt(maxItems as string, 10) : 5;
     const jobs = await apifyService.scrapeJobs(url, max);
 
-    // 5. Return results
     res.json({
       success: true,
       url: url,

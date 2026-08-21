@@ -25,9 +25,6 @@ export class ApifyService {
     this.client = new ApifyClient({ token: apiKey });
   }
 
-  /**
-   * Get the Apify API key from the database
-   */
   static async getApiKey(): Promise<string | null> {
     const [rows] = await pool.query<RowDataPacket[]>(
       'SELECT api_key FROM user_api_keys WHERE user_id = 1 AND provider = "apify"'
@@ -35,9 +32,6 @@ export class ApifyService {
     return rows.length > 0 ? rows[0].api_key : null;
   }
 
-  /**
-   * Scrape jobs from LinkedIn using Apify
-   */
   async scrapeJobs(
     linkedInUrl: string,
     maxItems: number = 50
@@ -53,7 +47,7 @@ export class ApifyService {
     const runInput = {
       urls: [linkedInUrl],
       count: requestedCount,
-      scrapeCompany: true, // set false if you don't need company detail scrapes
+      scrapeCompany: true,
     };
 
     console.log(`[Apify] Starting scrape for URL: ${linkedInUrl}`);
@@ -65,17 +59,13 @@ export class ApifyService {
         `[Apify] Actor run finished: ${run.id}, status: ${run.status}`
       );
 
-      // Get the dataset
       const dataset = await this.client.dataset(run.defaultDatasetId);
-
-      // ✅ ONLY fetch maxItems from the dataset
       const { items } = await dataset.listItems({ limit: maxItems });
 
       console.log(
         `[Apify] Retrieved ${items.length} jobs (limited to ${maxItems})`
       );
 
-      // Map the items to a consistent format
       const jobs: ApifyJob[] = items.map((item: any) => ({
         id: item.id || item.jobId || "",
         title: item.title || item.jobTitle || "",
@@ -101,13 +91,9 @@ export class ApifyService {
     }
   }
 
-  /**
-   * Check if the API key is valid by making a test call
-   */
   static async validateApiKey(apiKey: string): Promise<boolean> {
     try {
       const client = new ApifyClient({ token: apiKey });
-      // Try to get user info as a test
       await client.user();
       return true;
     } catch (error) {
