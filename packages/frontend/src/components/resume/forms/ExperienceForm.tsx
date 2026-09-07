@@ -14,7 +14,8 @@ import type {
   ExperienceBullet,
 } from "@resumeai/shared";
 
-import BulletRow from "../../UI/BulletRow";
+// import BulletRow from "../../UI/BulletRow";
+import { BulletRow } from "../../UI";
 
 const uid = () => crypto.randomUUID();
 

@@ -49,11 +49,9 @@ interface ResumeBuilderContextType {
   saveResume: (resume: Resume) => Promise<void>;
   loadResume: (id?: number | null) => Promise<void>;
   loadVariant: (variantId: number) => Promise<void>;
-  // saveAsNew: (name: string, isDefault: boolean) => Promise<number>;
   exportPdf: () => Promise<void>;
   templateConfig: TemplateConfig;
   updateTemplateConfig: (config: TemplateConfig) => void;
-  // saveTemplateConfig is no longer used (replaced by per‑entity save)
   currentResumeId: number | null;
   currentVariantId: number | null;
 }
@@ -139,7 +137,7 @@ export function ResumeBuilderProvider({
         }
 
         // Fetch name from list (to get display name)
-        const listRes = await fetch(`${API_BASE}/resumes/list`);
+        const listRes = await fetch(`${API_BASE}/resume/list`);
         if (listRes.ok) {
           const list = await listRes.json();
           if (id) {
@@ -317,10 +315,8 @@ export function ResumeBuilderProvider({
     [isVariant, currentVariantId, currentResumeId]
   );
 
-  // Update template config (called from UI) – saves locally and persists
   const updateTemplateConfig = (config: TemplateConfig) => {
     setTemplateConfig(config);
-    // Debounce save to avoid too many requests
     if (configSaveTimeout) clearTimeout(configSaveTimeout);
     const timeout = window.setTimeout(() => {
       saveTemplateConfigToCurrentEntity(config);
@@ -328,7 +324,6 @@ export function ResumeBuilderProvider({
     setConfigSaveTimeout(timeout);
   };
 
-  // Export PDF
   const exportPdf = async () => {
     const payload: any = { templateConfig };
     if (currentResumeId) {
@@ -356,19 +351,6 @@ export function ResumeBuilderProvider({
     URL.revokeObjectURL(url);
   };
 
-  // The old global save functions are no longer used – kept for reference (commented out)
-  /*
-  const saveTemplateConfigToServer = async (latestConfig: TemplateConfig) => {
-    // deprecated
-  };
-  const debouncedSaveTemplateConfig = (latestConfig: TemplateConfig) => {
-    // deprecated
-  };
-  const saveTemplateConfig = async () => {
-    // deprecated
-  };
-  */
-
   return (
     <ResumeBuilderContext.Provider
       value={{
@@ -388,11 +370,9 @@ export function ResumeBuilderProvider({
         saveResume,
         loadResume,
         loadVariant,
-        // saveAsNew,
         exportPdf,
         templateConfig,
         updateTemplateConfig,
-        // saveTemplateConfig, // removed – no longer used
         currentResumeId,
         currentVariantId,
       }}

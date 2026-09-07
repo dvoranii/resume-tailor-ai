@@ -21,8 +21,7 @@ const PRESET_COLORS = [
 ];
 
 export default function TemplateConfigPanel() {
-  const { templateConfig, updateTemplateConfig, saveTemplateConfig } =
-    useResumeBuilder();
+  const { templateConfig, updateTemplateConfig } = useResumeBuilder();
 
   const {
     sectionOrder,
@@ -52,9 +51,6 @@ export default function TemplateConfigPanel() {
     value: "left" | "center"
   ) => {
     updateTemplateConfig({ ...templateConfig, [field]: value });
-  };
-  const handleSave = async () => {
-    await saveTemplateConfig();
   };
 
   return (
@@ -177,14 +173,6 @@ export default function TemplateConfigPanel() {
       </div>
 
       <div className="w-px h-5 bg-border shrink-0" />
-
-      <button
-        onClick={handleSave}
-        className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white text-xs px-3 py-1.5 rounded-md transition-colors ml-auto"
-      >
-        <Save size={12} />
-        Save
-      </button>
     </div>
   );
 }

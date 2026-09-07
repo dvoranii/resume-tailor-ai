@@ -302,11 +302,18 @@ router.post("/pdf/variant/:id", async (req, res) => {
 router.get("/exports", async (req, res) => {
   const { search } = req.query;
   let query = `
-    SELECT id, resume_id, variant_id, job_title, company_name, file_name, created_at
+    SELECT 
+      id, 
+      resume_id, 
+      variant_id, 
+      job_title AS jobTitle, 
+      company_name AS companyName, 
+      file_name, 
+      created_at
     FROM exports
     WHERE user_id = 1
   `;
-  const params: any[] = [];
+  const params: string[] = [];
 
   if (search && typeof search === "string" && search.trim()) {
     const like = `%${search.trim()}%`;

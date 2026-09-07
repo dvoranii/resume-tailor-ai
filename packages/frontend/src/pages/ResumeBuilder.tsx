@@ -26,16 +26,15 @@ import { API_BASE } from "../types/jobs";
 function ResumeBuilderContent() {
   const {
     exportPdf,
-    // resume,
     isLoading,
     loadResume,
     loadVariant,
-    // saveAsNew,
     resumeName,
     isVariant,
     variantJobTitle,
     baseResumeIdForVariant,
     variantCompany,
+    currentResumeId,
   } = useResumeBuilder();
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,20 +122,6 @@ function ResumeBuilderContent() {
     }
   };
 
-  // const handleSaveAsNew = async () => {
-  //   const name = prompt("Enter a name for this base resume: ", "My Resume");
-  //   if (name === null) return;
-  //   const isDefault = confirm("Set as default?");
-  //   try {
-  //     const newId = await saveAsNew(name, isDefault);
-  //     setActiveResumeId(newId);
-  //     clearActiveVariantId();
-  //     navigate(`/resume?id=${newId}`);
-  //   } catch (error) {
-  //     console.error("Save as new failed:", error);
-  //   }
-  // };
-
   const handleBackToVariants = () => {
     clearActiveVariantId();
     if (baseResumeIdForVariant) {
@@ -211,13 +196,6 @@ function ResumeBuilderContent() {
               </>
             )}
 
-            {/* <button
-              onClick={handleSaveAsNew}
-              className="flex items-center gap-1.5 bg-accent/20 hover:bg-accent/30 text-accent text-sm px-3 py-2 rounded-md transition-colors"
-            >
-              Save as New
-            </button> */}
-
             <button
               onClick={handleExport}
               disabled={exporting}
@@ -232,7 +210,9 @@ function ResumeBuilderContent() {
         <div className="flex flex-1 gap-6 min-h-0">
           <ResumeForm
             isVariant={isVariant}
-            resumeId={resumeId ? Number(resumeId) : undefined}
+            resumeId={
+              currentResumeId ?? (resumeId ? Number(resumeId) : undefined)
+            }
           />
           <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
             <TemplateConfigPanel />

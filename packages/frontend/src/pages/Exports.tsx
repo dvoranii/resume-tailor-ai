@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_BASE } from "../types/jobs";
+import { Spinner, SearchInput } from "../components/UI";
 
 interface ExportRecord {
   id: number;
@@ -16,13 +17,15 @@ export default function Exports() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null); // ✅ New state
 
   useEffect(() => {
     fetchExports();
   }, []);
 
   const fetchExports = async (searchTerm?: string) => {
+    setLoading(true);
     try {
       const url = searchTerm
         ? `${API_BASE}/export/exports?search=${encodeURIComponent(searchTerm)}`
@@ -38,6 +41,7 @@ export default function Exports() {
   };
 
   const handleDownload = async (id: number, fileName: string) => {
+    setDownloadingId(id);
     try {
       const res = await fetch(`${API_BASE}/export/exports/${id}/download`);
       if (!res.ok) throw new Error("Download failed");
@@ -51,11 +55,13 @@ export default function Exports() {
     } catch (error) {
       console.error("Download failed:", error);
       alert("Failed to download export.");
+    } finally {
+      setDownloadingId(null);
     }
   };
 
   const handlePreview = async (id: number) => {
-    setPreviewLoading(true);
+    setIsPreviewLoading(true);
     try {
       const res = await fetch(`${API_BASE}/export/exports/${id}/download`);
       if (!res.ok) throw new Error("Preview failed");
@@ -66,7 +72,7 @@ export default function Exports() {
       console.error("Preview failed:", error);
       alert("Failed to load PDF preview.");
     } finally {
-      setPreviewLoading(false);
+      setIsPreviewLoading(false);
     }
   };
 
@@ -77,14 +83,9 @@ export default function Exports() {
     setPreviewUrl(null);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchExports(search);
-  };
-
-  const handleClearSearch = () => {
-    setSearch("");
-    fetchExports();
+  const handleSearch = (term: string) => {
+    setSearch(term);
+    fetchExports(term);
   };
 
   const formatDate = (dateStr: string) => {
@@ -100,32 +101,14 @@ export default function Exports() {
       <div className="flex items-center justify-between">
         <h1 className="text-text-primary font-semibold text-lg">Exports</h1>
         <div className="flex items-center gap-2">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by job title or company..."
-              className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              className="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-md text-sm"
-            >
-              Search
-            </button>
-            {search && (
-              <button
-                onClick={handleClearSearch}
-                className="text-text-muted hover:text-text-primary text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </form>
+          {/* ✅ Replace form with SearchInput */}
+          <SearchInput
+            placeholder="Search by job title or company..."
+            onSearch={handleSearch}
+            debounceMs={300}
+          />
         </div>
       </div>
-
       {loading && <p className="text-text-muted">Loading exports...</p>}
 
       {!loading && exports.length === 0 && (
@@ -149,7 +132,7 @@ export default function Exports() {
                   {exp.jobTitle || "Base Resume"}
                 </span>
                 {exp.companyName && (
-                  <span className="text-text-muted text-sm">
+                  <span className="text-text-muted text-sm block">
                     {exp.companyName}
                   </span>
                 )}
@@ -160,15 +143,20 @@ export default function Exports() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => handlePreview(exp.id)}
-                  className="text-accent hover:underline text-sm"
+                  className="cursor-pointer px-3 py-1.5 text-sm font-medium text-accent border border-accent/40 rounded-md transition-colors hover:bg-accent/10 hover:border-accent"
                 >
                   Preview
                 </button>
                 <button
                   onClick={() => handleDownload(exp.id, exp.fileName)}
-                  className="text-accent hover:underline text-sm"
+                  disabled={downloadingId === exp.id}
+                  className="cursor-pointer px-3 py-1.5 text-sm font-medium text-white bg-accent border border-accent rounded-md transition-colors hover:bg-accent/90 hover:border-accent/90 disabled:opacity-50 disabled:cursor-not-allowed min-w-[80px] flex items-center justify-center"
                 >
-                  Download
+                  {downloadingId === exp.id ? (
+                    <Spinner size="sm" color="white" />
+                  ) : (
+                    "Download"
+                  )}
                 </button>
               </div>
             </div>
@@ -176,7 +164,15 @@ export default function Exports() {
         </div>
       )}
 
-      {/* PDF Preview Modal */}
+      {isPreviewLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-surface rounded-lg p-6 flex flex-col items-center gap-3">
+            <Spinner size="lg" color="accent" />
+            <p className="text-text-muted text-sm">Loading preview...</p>
+          </div>
+        </div>
+      )}
+
       {previewUrl && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
@@ -196,17 +192,11 @@ export default function Exports() {
               </button>
             </div>
             <div className="flex-1 p-4 overflow-auto">
-              {previewLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-text-muted">Loading preview...</p>
-                </div>
-              ) : (
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full border-0"
-                  title="PDF Preview"
-                />
-              )}
+              <iframe
+                src={previewUrl}
+                className="w-full h-full border-0"
+                title="PDF Preview"
+              />
             </div>
           </div>
         </div>

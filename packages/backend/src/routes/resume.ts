@@ -173,6 +173,7 @@ async function fetchFullResumeData(
   }));
 
   return {
+    id: resumeId,
     name,
     templateConfig,
     personal: {
