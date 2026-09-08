@@ -5,7 +5,7 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 const router = Router();
 
 router.get("/", async (req, res) => {
-  const { collectionId, baseResumeId } = req.query;
+  const { collectionId, baseResumeId, search } = req.query;
 
   let query = `
     SELECT 
@@ -36,11 +36,16 @@ router.get("/", async (req, res) => {
   }
 
   if (baseResumeId) {
-    // Filter by collections that have this base_resume_id
     conditions.push(
       "collection_id IN (SELECT id FROM job_collections WHERE base_resume_id = ?)"
     );
     params.push(baseResumeId as string);
+  }
+
+  if (search && typeof search === "string" && search.trim()) {
+    const like = `%${search.trim()}%`;
+    conditions.push("(job_title LIKE ? OR company_name LIKE ?)");
+    params.push(like, like);
   }
 
   if (conditions.length > 0) {

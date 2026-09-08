@@ -4,17 +4,21 @@ import AddJobForm from "../components/jobs/AddJobForm";
 import NewCollectionForm from "../components/jobs/NewCollectionForm";
 import CollectionCard from "../components/jobs/CollectionCard";
 import { JobCard } from "../components/diff";
+import { SearchInput } from "../components/UI";
 
 export default function Jobs() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]); // ✅ Full unfiltered list
   const [collections, setCollections] = useState<Collection[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "manual" | number>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState("");
   const itemsPerPage = 10;
 
+  // ✅ Fetch all jobs (no filters) – only on mount and after data mutations
   const fetchJobs = async () => {
+    setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/jobs`);
       if (!response.ok) throw new Error("Failed to fetch");
@@ -37,15 +41,53 @@ export default function Jobs() {
     }
   };
 
+  // ✅ Only fetch on mount (no filters)
   useEffect(() => {
     fetchJobs();
     fetchCollections();
-  }, []);
+  }, []); // ✅ Empty dependency array – no re‑fetch on tab/search changes
 
-  // Reset to page 1 when the active tab or the jobs list changes
+  // ✅ Reset pagination when tab or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, jobs]);
+  }, [activeTab, search]);
+
+  // ✅ Client‑side filtering: apply tab/collection filter + search
+  const visibleJobs = jobs
+    .filter((job) => {
+      // 1. Filter by active tab (collection or manual)
+      if (activeTab === "manual") {
+        return job.collectionId === null;
+      } else if (activeTab !== "all") {
+        return job.collectionId === activeTab;
+      }
+      return true; // "all" – include everything
+    })
+    .filter((job) => {
+      // 2. Apply search (if any)
+      if (!search.trim()) return true;
+      const term = search.trim().toLowerCase();
+      return (
+        job.jobTitle.toLowerCase().includes(term) ||
+        job.companyName.toLowerCase().includes(term)
+      );
+    });
+
+  // ✅ Compute manual jobs from the full list (not filtered)
+  const hasManualJobs = jobs.some((j) => j.collectionId === null);
+
+  // Pagination (unchanged)
+  const totalPages = Math.ceil(visibleJobs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedJobs = visibleJobs.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   const handleAdd = (job: Job) => setJobs((prev) => [job, ...prev]);
 
@@ -90,38 +132,21 @@ export default function Jobs() {
         setActiveTab("all");
       }
 
-      await fetchJobs();
+      await fetchJobs(); // refresh from backend
     } catch (error) {
       console.error("Failed to delete collection:", error);
       await Promise.all([fetchJobs(), fetchCollections()]);
     }
   };
 
-  // Determine which jobs to show based on active tab
-  const visibleJobs = (() => {
-    if (activeTab === "all") return jobs;
-    if (activeTab === "manual")
-      return jobs.filter((j) => j.collectionId === null);
-    return jobs.filter((j) => j.collectionId === activeTab);
-  })();
-
-  const hasManualJobs = jobs.some((j) => j.collectionId === null);
-
-  // Pagination
-  const totalPages = Math.ceil(visibleJobs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedJobs = visibleJobs.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
-
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+  // ✅ Search handler
+  const handleSearch = (term: string) => {
+    setSearch(term);
   };
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl">
+      {/* Header with job count and search */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-text-primary font-semibold text-lg">Jobs</h1>
@@ -130,9 +155,16 @@ export default function Jobs() {
             tailoring.
           </p>
         </div>
-        <span className="text-xs text-text-muted bg-bg-surface border border-border px-2 py-1 rounded-md">
-          {visibleJobs.length} {visibleJobs.length === 1 ? "job" : "jobs"}
-        </span>
+        <div className="flex flex-col items-end gap-2">
+          <span className="text-xs text-text-muted bg-bg-surface border border-border px-2 py-1 rounded-md">
+            {visibleJobs.length} {visibleJobs.length === 1 ? "job" : "jobs"}
+          </span>
+          <SearchInput
+            placeholder="Search by job title or company..."
+            onSearch={handleSearch}
+            debounceMs={300}
+          />
+        </div>
       </div>
 
       <NewCollectionForm onCreated={handleCollectionCreated} />
@@ -154,6 +186,7 @@ export default function Jobs() {
             >
               All Jobs
             </button>
+            {/* ✅ Always show Manual Jobs if there are any manual jobs globally */}
             {hasManualJobs && (
               <button
                 onClick={() => setActiveTab("manual")}
@@ -191,7 +224,9 @@ export default function Jobs() {
         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-lg">
           <p className="text-text-muted text-sm">
             {activeTab === "all"
-              ? "No jobs added yet."
+              ? search.trim()
+                ? "No jobs match your search."
+                : "No jobs added yet."
               : activeTab === "manual"
               ? "No manual jobs added."
               : "No jobs in this collection yet."}
