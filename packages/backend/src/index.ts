@@ -1,14 +1,14 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import resumeRoutes from "./routes/resume";
-import exportRouter from "./routes/export";
-import tailorRouter from "./routes/tailor";
-import jobsRouter from "./routes/jobs";
-import templateConfigRouter from "./routes/templateConfig";
-import apiKeysRoutes from "./routes/apiKeys";
-import testApifyRoutes from "./routes/testApify";
-import collectionsRoutes from "./routes/collections";
+import resumeRoutes from "./routes/resume.js";
+import exportRouter from "./routes/export.js";
+import tailorRouter from "./routes/tailor.js";
+import jobsRouter from "./routes/jobs.js";
+import templateConfigRouter from "./routes/templateConfig.js";
+import apiKeysRoutes from "./routes/apiKeys.js";
+import testApifyRoutes from "./routes/testApify.js";
+import collectionsRoutes from "./routes/collections.js";
 
 dotenv.config();
 

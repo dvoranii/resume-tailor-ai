@@ -1,152 +1,73 @@
-import { useState, useEffect } from "react";
-import { API_BASE, type Job, type Collection } from "../types/jobs";
 import AddJobForm from "../components/jobs/AddJobForm";
 import NewCollectionForm from "../components/jobs/NewCollectionForm";
 import CollectionCard from "../components/jobs/CollectionCard";
 import { JobCard } from "../components/diff";
 import { SearchInput } from "../components/UI";
+import { useJobs } from "../hooks/useJobs";
+import { useCollections } from "../hooks/useCollections";
+import { useCollectionActions } from "../hooks/useCollectionActions";
+import { useJobsView } from "../hooks/useJobsView";
+import { deleteJob } from "../services/jobs";
 
 export default function Jobs() {
-  const [jobs, setJobs] = useState<Job[]>([]); // ✅ Full unfiltered list
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "manual" | number>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const itemsPerPage = 10;
+  const {
+    jobs,
+    loading,
+    error,
+    refetch: refreshJobs,
+    addJob,
+    removeJob,
+    removeJobsByCollection,
+  } = useJobs();
 
-  // ✅ Fetch all jobs (no filters) – only on mount and after data mutations
-  const fetchJobs = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/jobs`);
-      if (!response.ok) throw new Error("Failed to fetch");
-      const data = await response.json();
-      setJobs(data);
-    } catch {
-      setError("Failed to load jobs");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    collections,
+    addCollection,
+    removeCollection,
+    refresh: refreshCollections,
+  } = useCollections();
 
-  const fetchCollections = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/collections`);
-      if (!response.ok) throw new Error("Failed to fetch");
-      setCollections(await response.json());
-    } catch {
-      console.error("Failed to load collections");
-    }
-  };
+  const {
+    activeTab,
+    setActiveTab,
+    search,
+    setSearch,
+    currentPage,
+    totalPages,
+    goToPage,
+    visibleJobs,
+    paginatedJobs,
+    hasManualJobs,
+  } = useJobsView(jobs);
 
-  // ✅ Only fetch on mount (no filters)
-  useEffect(() => {
-    fetchJobs();
-    fetchCollections();
-  }, []); // ✅ Empty dependency array – no re‑fetch on tab/search changes
-
-  // ✅ Reset pagination when tab or search changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, search]);
-
-  // ✅ Client‑side filtering: apply tab/collection filter + search
-  const visibleJobs = jobs
-    .filter((job) => {
-      // 1. Filter by active tab (collection or manual)
-      if (activeTab === "manual") {
-        return job.collectionId === null;
-      } else if (activeTab !== "all") {
-        return job.collectionId === activeTab;
-      }
-      return true; // "all" – include everything
-    })
-    .filter((job) => {
-      // 2. Apply search (if any)
-      if (!search.trim()) return true;
-      const term = search.trim().toLowerCase();
-      return (
-        job.jobTitle.toLowerCase().includes(term) ||
-        job.companyName.toLowerCase().includes(term)
-      );
-    });
-
-  // ✅ Compute manual jobs from the full list (not filtered)
-  const hasManualJobs = jobs.some((j) => j.collectionId === null);
-
-  // Pagination (unchanged)
-  const totalPages = Math.ceil(visibleJobs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedJobs = visibleJobs.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
-
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  };
-
-  const handleAdd = (job: Job) => setJobs((prev) => [job, ...prev]);
+  const { scrape, remove: removeCollectionAction } = useCollectionActions({
+    onScraped: () => {
+      refreshJobs();
+      refreshCollections();
+    },
+    onDeleted: (id) => {
+      removeJobsByCollection(id);
+      removeCollection(id);
+      if (activeTab === id) setActiveTab("all");
+      refreshJobs();
+    },
+    onDeleteFailed: () => {
+      refreshJobs();
+      refreshCollections();
+    },
+  });
 
   const handleDelete = async (id: number) => {
     try {
-      await fetch(`${API_BASE}/jobs/${id}`, { method: "DELETE" });
-      setJobs((prev) => prev.filter((j) => j.id !== id));
+      await deleteJob(id);
+      removeJob(id);
     } catch {
       console.error("Failed to delete job");
     }
   };
 
-  const handleCollectionCreated = (c: Collection) =>
-    setCollections((prev) => [c, ...prev]);
-
-  const handleScrapeCollection = async (id: number) => {
-    try {
-      const res = await fetch(`${API_BASE}/collections/${id}/scrape`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Scrape failed");
-      await Promise.all([fetchJobs(), fetchCollections()]);
-    } catch {
-      console.error("Failed to scrape collection");
-    }
-  };
-
-  const handleDeleteCollection = async (id: number) => {
-    try {
-      setJobs((prev) => prev.filter((job) => job.collectionId !== id));
-      setCollections((prev) => prev.filter((c) => c.id !== id));
-
-      const response = await fetch(`${API_BASE}/collections/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete collection");
-      }
-
-      if (activeTab === id) {
-        setActiveTab("all");
-      }
-
-      await fetchJobs(); // refresh from backend
-    } catch (error) {
-      console.error("Failed to delete collection:", error);
-      await Promise.all([fetchJobs(), fetchCollections()]);
-    }
-  };
-
-  // ✅ Search handler
-  const handleSearch = (term: string) => {
-    setSearch(term);
-  };
-
   return (
     <div className="flex flex-col gap-6 max-w-5xl">
-      {/* Header with job count and search */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-text-primary font-semibold text-lg">Jobs</h1>
@@ -161,20 +82,18 @@ export default function Jobs() {
           </span>
           <SearchInput
             placeholder="Search by job title or company..."
-            onSearch={handleSearch}
+            onSearch={setSearch}
             debounceMs={300}
           />
         </div>
       </div>
 
-      <NewCollectionForm onCreated={handleCollectionCreated} />
-      <AddJobForm onAdd={handleAdd} />
+      <NewCollectionForm onCreated={addCollection} />
+      <AddJobForm onAdd={addJob} />
 
-      {/* Tabs + Collections */}
       <div className="flex flex-col gap-2">
         <span className="text-xs text-text-muted">Collections</span>
         <div className="flex items-start gap-3">
-          {/* Static tabs – stacked vertically */}
           <div className="flex flex-col gap-1 min-w-[120px]">
             <button
               onClick={() => setActiveTab("all")}
@@ -186,7 +105,7 @@ export default function Jobs() {
             >
               All Jobs
             </button>
-            {/* ✅ Always show Manual Jobs if there are any manual jobs globally */}
+
             {hasManualJobs && (
               <button
                 onClick={() => setActiveTab("manual")}
@@ -200,8 +119,6 @@ export default function Jobs() {
               </button>
             )}
           </div>
-
-          {/* Collections – horizontally scrollable */}
           <div className="flex-1 overflow-x-auto flex items-center gap-2 pb-1">
             {collections.map((c) => (
               <CollectionCard
@@ -209,8 +126,8 @@ export default function Jobs() {
                 collection={c}
                 active={activeTab === c.id}
                 onSelect={() => setActiveTab(c.id)}
-                onScrape={() => handleScrapeCollection(c.id)}
-                onDelete={() => handleDeleteCollection(c.id)}
+                onScrape={() => scrape(c.id)}
+                onDelete={() => removeCollectionAction(c.id)}
               />
             ))}
           </div>
@@ -249,7 +166,6 @@ export default function Jobs() {
             ))}
           </div>
 
-          {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-4">
               <button

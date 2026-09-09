@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../db";
+import { pool } from "../db.js";
 import { ResumeSchema } from "@resumeai/shared";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { ZodError, ZodIssue } from "zod";

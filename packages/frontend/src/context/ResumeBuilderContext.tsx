@@ -1,18 +1,15 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import type { Resume, TemplateConfig } from "@resumeai/shared";
-import { API_BASE } from "../types/jobs";
-
-const defaultTemplateConfig: TemplateConfig = {
-  sectionOrder: ["summary", "experience", "education", "skills", "projects"],
-  sectionTitleColor: "#1155cc",
-  nameAlignment: "left",
-  titleAlignment: "left",
-  summaryAlignment: "left",
-  experienceOrder: [],
-  educationOrder: [],
-  projectsOrder: [],
-  contactAlignment: "left",
-};
+import {
+  fetchResume,
+  fetchResumeList,
+  fetchVariantById,
+  saveResumeApi,
+  saveVariantApi,
+  saveTemplateConfig,
+  exportResumePdf,
+} from "../services/resumes";
+import { defaultTemplateConfig } from "@resumeai/shared";
 
 const defaultResume: Resume = {
   personal: {
@@ -65,13 +62,11 @@ export function ResumeBuilderProvider({
 }: {
   children: React.ReactNode;
 }) {
-  // base resume
   const [resume, setResume] = useState<Resume>(defaultResume);
   const [isLoading, setIsLoading] = useState(true);
   const [currentResumeId, setCurrentResumeId] = useState<number | null>(null);
   const [resumeName, setResumeName] = useState<string>("My Resume");
 
-  // variants
   const [currentVariantId, setCurrentVariantId] = useState<number | null>(null);
   const [isVariant, setIsVariant] = useState(false);
   const [variantJobTitle, setVariantJobTitle] = useState("");
@@ -99,8 +94,7 @@ export function ResumeBuilderProvider({
     setBaseResumeIdForVariant(null);
   }, []);
 
-  // Fetch base resume data
-  const fetchResumeData = useCallback(
+  const loadResume = useCallback(
     async (id?: number | null) => {
       setIsLoading(true);
       try {
@@ -108,46 +102,31 @@ export function ResumeBuilderProvider({
           resetToEmpty();
           return;
         }
-        let url = `${API_BASE}/resume`;
 
-        if (id) {
-          url += `?id=${id}`;
+        const data = await fetchResume(id);
+        if (data === null) {
+          resetToEmpty();
+          return;
         }
 
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            resetToEmpty();
-            return;
-          }
-          throw new Error(`Failed to fetch resume: ${response.status}`);
-        }
-
-        const data = await response.json();
         setResume(data);
         setCurrentResumeId(id || null);
-        setResumeName(data.name || "Untitled");
+        setResumeName((data as any).name || "Untitled");
 
-        // ✅ Set template config from response
-        if (data.templateConfig) {
-          setTemplateConfig(data.templateConfig);
+        if ((data as any).templateConfig) {
+          setTemplateConfig((data as any).templateConfig);
         } else {
           setTemplateConfig(defaultTemplateConfig);
         }
 
-        // Fetch name from list (to get display name)
-        const listRes = await fetch(`${API_BASE}/resume/list`);
-        if (listRes.ok) {
-          const list = await listRes.json();
-          if (id) {
-            const found = list.find((r: any) => r.id === id);
-            if (found) setResumeName(found.name);
-          } else {
-            const defaultOne = list.find((r: any) => r.isDefault === true);
-            if (defaultOne) setResumeName(defaultOne.name);
-            else if (list.length > 0) setResumeName(list[0].name);
-          }
+        const list = await fetchResumeList();
+        if (id) {
+          const found = list.find((r) => r.id === id);
+          if (found) setResumeName(found.name);
+        } else {
+          const defaultOne = list.find((r) => r.isDefault === 1);
+          if (defaultOne) setResumeName(defaultOne.name);
+          else if (list.length > 0) setResumeName(list[0].name);
         }
       } catch (error) {
         console.error("Error loading resume:", error);
@@ -159,70 +138,43 @@ export function ResumeBuilderProvider({
     [resetToEmpty]
   );
 
-  const loadResume = useCallback(
-    async (id?: number | null) => {
-      await fetchResumeData(id);
-    },
-    [fetchResumeData]
-  );
-
-  // Load variant
-  const loadVariant = useCallback(async (variantId: number) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/resume/variants/${variantId}`);
-      if (!response.ok) throw new Error("Failed to fetch variant");
-      const data = await response.json();
-      setResume(data.tailoredData);
-      setCurrentVariantId(variantId);
-      setIsVariant(true);
-      setVariantJobTitle(data.jobTitle || "");
-      setVariantCompany(data.companyName || "");
-      setResumeName(`${data.jobTitle} at ${data.companyName} (Tailored)`);
-      // ✅ Set template config from variant
-      if (data.templateConfig) {
-        setTemplateConfig(data.templateConfig);
-      } else {
-        setTemplateConfig(defaultTemplateConfig);
-      }
-      setCurrentResumeId(null);
-      setBaseResumeIdForVariant(data.resumeId || null);
-    } catch (error) {
-      console.error("Error loading variant:", error);
-      resetToEmpty();
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Save variant (content only)
-  const saveVariant = useCallback(
-    async (variantId: number, data: Resume) => {
+  const loadVariant = useCallback(
+    async (variantId: number) => {
+      setIsLoading(true);
       try {
-        const response = await fetch(
-          `${API_BASE}/resume/variants/${variantId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tailoredData: data,
-              templateConfig: templateConfig, // ✅ also send current template config
-            }),
-          }
-        );
-        if (!response.ok) throw new Error("Failed to save variant");
+        const data = await fetchVariantById(variantId);
+        setResume(data.tailoredData);
+        setCurrentVariantId(variantId);
+        setIsVariant(true);
+        setVariantJobTitle(data.jobTitle || "");
+        setVariantCompany(data.companyName || "");
+        setResumeName(`${data.jobTitle} at ${data.companyName} (Tailored)`);
+
+        if ((data as any).templateConfig) {
+          setTemplateConfig((data as any).templateConfig);
+        } else {
+          setTemplateConfig(defaultTemplateConfig);
+        }
+        setCurrentResumeId(null);
+        setBaseResumeIdForVariant(data.resumeId || null);
       } catch (error) {
-        console.error("Error saving variant:", error);
+        console.error("Error loading variant:", error);
+        resetToEmpty();
+      } finally {
+        setIsLoading(false);
       }
     },
-    [templateConfig]
+    [resetToEmpty]
   );
 
-  // Save base resume (content only)
   const saveResume = useCallback(
     async (latestResume: Resume) => {
       if (isVariant && currentVariantId) {
-        await saveVariant(currentVariantId, latestResume);
+        try {
+          await saveVariantApi(currentVariantId, latestResume, templateConfig);
+        } catch (error) {
+          console.error("Error saving variant:", error);
+        }
         return;
       }
       if (currentResumeId === null) {
@@ -236,30 +188,14 @@ export function ResumeBuilderProvider({
           resumeId: currentResumeId,
           name: resumeName,
           isDefault: false,
-          templateConfig: templateConfig, // ✅ include template config
+          templateConfig,
         };
-
-        const response = await fetch(`${API_BASE}/resume`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          console.error("Failed to save resume:", response.status);
-        }
+        await saveResumeApi(payload);
       } catch (error) {
         console.error("Error saving resume:", error);
       }
     },
-    [
-      currentResumeId,
-      resumeName,
-      isVariant,
-      currentVariantId,
-      saveVariant,
-      templateConfig,
-    ]
+    [currentResumeId, resumeName, isVariant, currentVariantId, templateConfig]
   );
 
   const debouncedSave = (latestResume: Resume) => {
@@ -288,61 +224,31 @@ export function ResumeBuilderProvider({
   const updateEducation = (education: Resume["education"]) =>
     updateField("education", education);
 
-  // ============================================================
-  // Template Config Persistence (per resume / variant)
-  // ============================================================
-
-  // Save template config to the current entity (base or variant)
-  const saveTemplateConfigToCurrentEntity = useCallback(
-    async (config: TemplateConfig) => {
-      if (isVariant && currentVariantId) {
-        await fetch(
-          `${API_BASE}/resume/variants/${currentVariantId}/template`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ templateConfig: config }),
-          }
-        );
-      } else if (currentResumeId) {
-        await fetch(`${API_BASE}/resume/${currentResumeId}/template`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ templateConfig: config }),
-        });
-      }
-    },
-    [isVariant, currentVariantId, currentResumeId]
-  );
-
   const updateTemplateConfig = (config: TemplateConfig) => {
     setTemplateConfig(config);
     if (configSaveTimeout) clearTimeout(configSaveTimeout);
     const timeout = window.setTimeout(() => {
-      saveTemplateConfigToCurrentEntity(config);
+      const target =
+        isVariant && currentVariantId
+          ? { type: "variant" as const, id: currentVariantId }
+          : currentResumeId
+          ? { type: "resume" as const, id: currentResumeId }
+          : null;
+      if (target) saveTemplateConfig(target, config);
     }, 800);
     setConfigSaveTimeout(timeout);
   };
 
   const exportPdf = async () => {
-    const payload: any = { templateConfig };
-    if (currentResumeId) {
-      payload.resumeId = currentResumeId;
-    }
-    if (currentVariantId) {
-      payload.variantId = currentVariantId;
-    }
+    const payload: {
+      templateConfig: TemplateConfig;
+      resumeId?: number;
+      variantId?: number;
+    } = { templateConfig };
+    if (currentResumeId) payload.resumeId = currentResumeId;
+    if (currentVariantId) payload.variantId = currentVariantId;
 
-    const response = await fetch(`${API_BASE}/export/pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Export failed");
-    }
-    const blob = await response.blob();
+    const blob = await exportResumePdf(payload);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

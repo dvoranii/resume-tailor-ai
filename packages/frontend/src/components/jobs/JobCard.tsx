@@ -9,10 +9,8 @@ import {
   Eye,
 } from "lucide-react";
 import { type Job, statusColors } from "../../types/jobs";
-import { API_BASE } from "../../types/jobs";
-import type { Resume } from "@resumeai/shared";
 import DiffModal from "../diff/DiffModal";
-// import DiffReview from "../diff/DiffReview";
+import { useDiffModal } from "../../hooks/useDiffModal";
 
 export default function JobCard({
   job,
@@ -22,12 +20,6 @@ export default function JobCard({
   onDelete: (id: number) => void;
 }) {
   const [showReasoning, setShowReasoning] = useState(false);
-  const [showDiffModal, setShowDiffModal] = useState(false);
-  const [diffData, setDiffData] = useState<{
-    original: Resume;
-    tailored: Resume;
-  } | null>(null);
-  const [loadingDiff, setLoadingDiff] = useState(false);
 
   const {
     id,
@@ -41,32 +33,16 @@ export default function JobCard({
     variantId,
   } = job;
 
-  const handleViewChanges = async () => {
-    if (!variantId) return;
-    setLoadingDiff(true);
-    try {
-      const variantRes = await fetch(
-        `${API_BASE}/resume/variants/${variantId}`
-      );
-      const variantData = await variantRes.json();
-      const baseResumeId = variantData.resumeId;
-      if (!baseResumeId) {
-        alert("Could not find base resume for this variant.");
-        return;
-      }
-      const originalRes = await fetch(`${API_BASE}/resume?id=${baseResumeId}`);
-      const originalData = await originalRes.json();
-      setDiffData({
-        original: originalData,
-        tailored: variantData.tailoredData,
-      });
-      setShowDiffModal(true);
-    } catch (error) {
-      console.error("Failed to load diff:", error);
-      alert("Failed to load changes.");
-    } finally {
-      setLoadingDiff(false);
-    }
+  const {
+    showDiffModal,
+    diffData,
+    loadingDiff,
+    openDiffModal,
+    closeDiffModal,
+  } = useDiffModal();
+
+  const handleViewChanges = () => {
+    if (variantId) openDiffModal(variantId);
   };
 
   return (
@@ -164,7 +140,7 @@ export default function JobCard({
           tailored={diffData.tailored}
           jobTitle={jobTitle}
           companyName={companyName}
-          onClose={() => setShowDiffModal(false)}
+          onClose={closeDiffModal}
         />
       )}
     </>

@@ -1,51 +1,29 @@
-import { useState, useEffect } from "react";
-import { API_BASE } from "../types/jobs";
+import { useState, useMemo } from "react";
 import { Spinner, SearchInput } from "../components/UI";
-
-interface ExportRecord {
-  id: number;
-  resumeId: number | null;
-  variantId: number | null;
-  jobTitle: string | null;
-  companyName: string | null;
-  fileName: string;
-  created_at: string;
-}
+import { useExports } from "../hooks/useExports";
+import { downloadExportById } from "../services/exports";
 
 export default function Exports() {
-  const [exports, setExports] = useState<ExportRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { exports: allExports, loading } = useExports();
   const [search, setSearch] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null); // ✅ New state
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchExports();
-  }, []);
-
-  const fetchExports = async (searchTerm?: string) => {
-    setLoading(true);
-    try {
-      const url = searchTerm
-        ? `${API_BASE}/export/exports?search=${encodeURIComponent(searchTerm)}`
-        : `${API_BASE}/export/exports`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setExports(data);
-    } catch (error) {
-      console.error("Failed to fetch exports:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const visibleExports = useMemo(() => {
+    if (!search.trim()) return allExports;
+    const term = search.trim().toLowerCase();
+    return allExports.filter(
+      (exp) =>
+        exp.jobTitle?.toLowerCase().includes(term) ||
+        exp.companyName?.toLowerCase().includes(term)
+    );
+  }, [allExports, search]);
 
   const handleDownload = async (id: number, fileName: string) => {
     setDownloadingId(id);
     try {
-      const res = await fetch(`${API_BASE}/export/exports/${id}/download`);
-      if (!res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
+      const blob = await downloadExportById(id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -63,9 +41,7 @@ export default function Exports() {
   const handlePreview = async (id: number) => {
     setIsPreviewLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/export/exports/${id}/download`);
-      if (!res.ok) throw new Error("Preview failed");
-      const blob = await res.blob();
+      const blob = await downloadExportById(id);
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
     } catch (error) {
@@ -85,7 +61,6 @@ export default function Exports() {
 
   const handleSearch = (term: string) => {
     setSearch(term);
-    fetchExports(term);
   };
 
   const formatDate = (dateStr: string) => {
@@ -100,29 +75,31 @@ export default function Exports() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-text-primary font-semibold text-lg">Exports</h1>
-        <div className="flex items-center gap-2">
-          {/* ✅ Replace form with SearchInput */}
-          <SearchInput
-            placeholder="Search by job title or company..."
-            onSearch={handleSearch}
-            debounceMs={300}
-          />
-        </div>
+        <SearchInput
+          placeholder="Search by job title or company..."
+          onSearch={handleSearch}
+          debounceMs={300}
+        />
       </div>
+
       {loading && <p className="text-text-muted">Loading exports...</p>}
 
-      {!loading && exports.length === 0 && (
+      {!loading && visibleExports.length === 0 && (
         <div className="text-center py-16 border border-dashed border-border rounded-lg">
-          <p className="text-text-muted">No exports yet.</p>
+          <p className="text-text-muted">
+            {search.trim()
+              ? "No exports match your search."
+              : "No exports yet."}
+          </p>
           <p className="text-text-muted text-sm mt-1">
             Export a resume from the Resume Builder to see it here.
           </p>
         </div>
       )}
 
-      {!loading && exports.length > 0 && (
+      {!loading && visibleExports.length > 0 && (
         <div className="flex flex-col gap-3">
-          {exports.map((exp) => (
+          {visibleExports.map((exp) => (
             <div
               key={exp.id}
               className="flex items-center justify-between bg-bg-surface border border-border rounded-lg px-4 py-3"

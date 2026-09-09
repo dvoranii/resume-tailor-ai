@@ -9,8 +9,6 @@ import {
 import { useResumeBuilder } from "../../../context/ResumeBuilderContext";
 import type { Education } from "@resumeai/shared";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const uid = () => crypto.randomUUID();
 
 const newEducation = (): Education => ({
@@ -21,8 +19,6 @@ const newEducation = (): Education => ({
   graduationYear: "",
   displayOrder: 0,
 });
-
-// ─── Education Card ───────────────────────────────────────────────────────────
 
 interface EducationCardProps {
   education: Education;
@@ -38,7 +34,6 @@ function EducationCard({ education, onChange, onDelete }: EducationCardProps) {
 
   return (
     <div className="border border-border rounded-lg bg-bg-surface">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <GripVertical size={16} className="text-text-muted shrink-0" />
         <div className="flex-1 min-w-0">
@@ -65,7 +60,6 @@ function EducationCard({ education, onChange, onDelete }: EducationCardProps) {
         </button>
       </div>
 
-      {/* Fields */}
       {expanded && (
         <div className="grid grid-cols-2 gap-3 px-4 pb-4 border-t border-border pt-4">
           <div className="flex flex-col gap-1.5 col-span-2">
@@ -113,8 +107,6 @@ function EducationCard({ education, onChange, onDelete }: EducationCardProps) {
     </div>
   );
 }
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function EducationForm() {
   const { resume, updateEducation } = useResumeBuilder();

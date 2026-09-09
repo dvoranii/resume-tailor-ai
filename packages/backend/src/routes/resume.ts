@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { pool } from "../db";
+import { pool } from "../db.js";
 import { ResumeSaveSchema } from "@resumeai/shared";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { ZodError, ZodIssue } from "zod";
-import { isResumeComplete } from "../services/resumeValidation";
+import { isResumeComplete } from "../services/resumeValidation.js";
 
 const router = Router();
 

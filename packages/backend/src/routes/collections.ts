@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { pool } from "../db";
+import { pool } from "../db.js";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
-import { ApifyService } from "../services/apifyService";
-import { buildLinkedInUrl } from "../utils/linkedinUrlBuilder";
+import { ApifyService } from "../services/apifyService.js";
+import { buildLinkedInUrl } from "../utils/linkedinUrlBuilder.js";
 import {
   scoreJobAgainstResume,
   MIN_FIT_SCORE,
-} from "../services/scoringService";
+} from "../services/scoringService.js";
 
 const router = Router();
 const MIN_ITEMS = 10;

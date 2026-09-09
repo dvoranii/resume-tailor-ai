@@ -1,47 +1,17 @@
-import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { API_BASE } from "../types/jobs";
 import { setActiveVariantId } from "../utils/activeResume";
-
-interface Variant {
-  id: number;
-  jobId: number | null;
-  jobTitle: string;
-  companyName: string;
-  createdAt: string;
-  updatedAt: string;
-  jobUrl: string | null;
-  fitScore: number | null;
-}
+import { useBaseResume } from "../hooks/useBaseResume";
+import { useBaseResumeVariants } from "../hooks/useBaseResumeVariants";
 
 export default function BaseResumeVariants() {
   const { id } = useParams<{ id: string }>();
-  const [variants, setVariants] = useState<Variant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [baseResumeName, setBaseResumeName] = useState("");
   const navigate = useNavigate();
+  const baseResumeId = Number(id);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch base resume name
-        const resumeRes = await fetch(`${API_BASE}/resume/list`);
-        const resumes = await resumeRes.json();
-        const found = resumes.find((r: any) => r.id === Number(id));
-        if (found) setBaseResumeName(found.name);
-
-        // Fetch variants for this base resume
-        const variantsRes = await fetch(`${API_BASE}/resume/${id}/variants`);
-        const data = await variantsRes.json();
-        setVariants(data);
-      } catch (error) {
-        console.error("Error fetching variants:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+  const { name: baseResumeName, loading: nameLoading } =
+    useBaseResume(baseResumeId);
+  const { variants, loading: variantsLoading } =
+    useBaseResumeVariants(baseResumeId);
 
   const handleEditVariant = (variantId: number) => {
     setActiveVariantId(variantId);
@@ -49,9 +19,10 @@ export default function BaseResumeVariants() {
   };
 
   const handleBack = () => {
-    // Navigate directly to the base resume editor
-    navigate(`/resume?id=${id}`);
+    navigate(`/resume?id=${baseResumeId}`);
   };
+
+  const loading = nameLoading || variantsLoading;
 
   return (
     <div className="flex flex-col gap-6">

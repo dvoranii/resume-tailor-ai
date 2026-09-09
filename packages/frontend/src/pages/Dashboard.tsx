@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   setActiveResumeId,
@@ -6,76 +5,24 @@ import {
   clearActiveResumeId,
   clearActiveVariantId,
 } from "../utils/activeResume";
-
-import { API_BASE } from "../types/jobs";
-
-interface RawResume {
-  id: number;
-  name: string;
-  summary: string;
-  isDefault: number;
-  isComplete: number;
-  variantCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-interface BaseResume {
-  id: number;
-  name: string;
-  summary: string;
-  isDefault: boolean;
-  isComplete: boolean;
-  variantCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function convertToBaseResume(raw: RawResume): BaseResume {
-  return {
-    ...raw,
-    isDefault: raw.isDefault === 1,
-    isComplete: raw.isComplete === 1,
-  };
-}
+import { useBaseResumes } from "../hooks/useBaseResumes";
+import { useResumeActions } from "../hooks/useResumeActions";
 
 export default function Dashboard() {
-  const [resumes, setResumes] = useState<BaseResume[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchResumes();
-  }, []);
+  const { resumes, loading, refresh } = useBaseResumes();
 
-  const fetchResumes = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/resume/list`);
-      const rawData: RawResume[] = await res.json();
-      const mapped = rawData.map(convertToBaseResume);
-      setResumes(mapped);
-    } catch (error) {
-      console.error("Failed to fetch resumes:", error);
-    } finally {
-      setLoading(false);
-    }
+  const { setDefault: setDefaultAction, deleteResumeById: deleteResumeAction } =
+    useResumeActions(refresh);
+
+  const handleSetDefault = async (id: number) => {
+    await setDefaultAction(id);
+    setActiveResumeId(id);
+    clearActiveVariantId();
   };
 
-  const setDefault = async (id: number) => {
-    try {
-      await fetch(`${API_BASE}/resume/${id}/default`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDefault: true }),
-      });
-      setActiveResumeId(id);
-      clearActiveVariantId();
-      fetchResumes();
-    } catch (error) {
-      console.error("Failed to set default:", error);
-    }
-  };
-
-  const deleteResume = async (id: number) => {
+  const handleDeleteResume = async (id: number) => {
     if (
       !confirm(
         "⚠️ Delete this base resume?\n\n" +
@@ -84,16 +31,12 @@ export default function Dashboard() {
           "• This resume cannot be deleted if it has any variants.\n\n" +
           "This action cannot be undone."
       )
-    )
+    ) {
       return;
-    try {
-      await fetch(`${API_BASE}/resume/${id}`, { method: "DELETE" });
-      const activeId = getActiveResumeId();
-      if (activeId === id) clearActiveResumeId();
-      fetchResumes();
-    } catch (error) {
-      console.error("Failed to delete resume:", error);
     }
+    await deleteResumeAction(id);
+    const activeId = getActiveResumeId();
+    if (activeId === id) clearActiveResumeId();
   };
 
   return (
@@ -169,14 +112,14 @@ export default function Dashboard() {
               )}
               {!resume.isDefault && (
                 <button
-                  onClick={() => setDefault(resume.id)}
+                  onClick={() => handleSetDefault(resume.id)}
                   className="text-text-muted hover:text-accent text-sm"
                 >
                   Set Default
                 </button>
               )}
               <button
-                onClick={() => deleteResume(resume.id)}
+                onClick={() => handleDeleteResume(resume.id)}
                 className="text-text-muted hover:text-red-400 text-sm ml-auto"
               >
                 Delete

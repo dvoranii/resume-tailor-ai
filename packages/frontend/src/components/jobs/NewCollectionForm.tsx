@@ -1,11 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, ChevronDown, ChevronUp, Folder } from "lucide-react";
-import { API_BASE, type Collection } from "../../types/jobs";
-
-interface BaseResumeOption {
-  id: number;
-  name: string;
-}
+import { type Collection } from "../../types/jobs";
+import { useBaseResumes } from "../../hooks/useBaseResumes";
+import { createCollection } from "../../services/collections";
 
 export default function NewCollectionForm({
   onCreated,
@@ -15,7 +12,6 @@ export default function NewCollectionForm({
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resumes, setResumes] = useState<BaseResumeOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     searchQuery: "",
@@ -24,13 +20,7 @@ export default function NewCollectionForm({
     baseResumeId: "",
   });
 
-  useEffect(() => {
-    if (!expanded || resumes.length > 0) return;
-    fetch(`${API_BASE}/resume/list`)
-      .then((r) => r.json())
-      .then((data: BaseResumeOption[]) => setResumes(data))
-      .catch(() => setError("Failed to load base resumes"));
-  }, [expanded, resumes.length]);
+  const { resumes } = useBaseResumes();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -44,27 +34,25 @@ export default function NewCollectionForm({
       setError("Collection name and search query are required");
       return;
     }
+    if (!form.baseResumeId) {
+      setError("Please select a base resume");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
+
     try {
-      const response = await fetch(`${API_BASE}/collections`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          searchQuery: form.searchQuery,
-          location: form.location || null,
-          maxItems: Number(form.maxItems) || 25,
-          baseResumeId: Number(form.baseResumeId),
-        }),
+      const { id } = await createCollection({
+        name: form.name,
+        searchQuery: form.searchQuery,
+        location: form.location || null,
+        maxItems: Number(form.maxItems) || 25,
+        baseResumeId: Number(form.baseResumeId),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || "Failed to create collection");
-        return;
-      }
+
       onCreated({
-        id: data.id,
+        id,
         name: form.name,
         searchQuery: form.searchQuery,
         location: form.location || null,
@@ -72,6 +60,7 @@ export default function NewCollectionForm({
         lastScrapedAt: null,
         totalJobsFound: 0,
       });
+
       setForm({
         name: "",
         searchQuery: "",
@@ -80,8 +69,10 @@ export default function NewCollectionForm({
         baseResumeId: "",
       });
       setExpanded(false);
-    } catch {
-      setError("Failed to connect to server");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create collection"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +173,7 @@ export default function NewCollectionForm({
           <div className="flex justify-end">
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || !form.baseResumeId}
               className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm px-4 py-2 rounded-md transition-colors"
             >
               <Plus size={14} />

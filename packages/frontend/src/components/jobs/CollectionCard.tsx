@@ -40,7 +40,6 @@ export default function CollectionCard({
 
   return (
     <>
-      {/* Collection Card */}
       <button
         onClick={onSelect}
         className={`flex flex-col items-start gap-1 border rounded-lg px-3 py-2 min-w-[170px] text-left transition-colors ${
@@ -71,7 +70,6 @@ export default function CollectionCard({
         </span>
       </button>
 
-      {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-surface border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
