@@ -67,7 +67,7 @@ export default function Jobs() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl">
+    <div className="flex flex-col gap-6 w-full">
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-text-primary font-semibold text-lg">Jobs</h1>
@@ -76,20 +76,20 @@ export default function Jobs() {
             tailoring.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="text-xs text-text-muted bg-bg-surface border border-border px-2 py-1 rounded-md">
-            {visibleJobs.length} {visibleJobs.length === 1 ? "job" : "jobs"}
-          </span>
-          <SearchInput
-            placeholder="Search by job title or company..."
-            onSearch={setSearch}
-            debounceMs={300}
-          />
-        </div>
       </div>
 
       <NewCollectionForm onCreated={addCollection} />
       <AddJobForm onAdd={addJob} />
+      <div className="flex items-center gap-3 justify-end">
+        <span className="text-xs text-text-muted bg-bg-surface border border-border px-2 py-1 rounded-md shrink-0">
+          {visibleJobs.length} {visibleJobs.length === 1 ? "job" : "jobs"}
+        </span>
+        <SearchInput
+          placeholder="Search by job title or company..."
+          onSearch={setSearch}
+          debounceMs={300}
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="text-xs text-text-muted">Collections</span>
