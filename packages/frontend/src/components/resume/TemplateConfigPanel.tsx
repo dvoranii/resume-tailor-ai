@@ -64,7 +64,7 @@ export default function TemplateConfigPanel() {
                 })
               }
               style={{ backgroundColor: color }}
-              className={`w-4 h-4 rounded-full transition-transform hover:scale-110 ${
+              className={`hover:cursor-pointer w-4 h-4 rounded-full transition-transform hover:scale-110 ${
                 sectionTitleColor === color
                   ? "ring-2 ring-offset-1 ring-offset-bg-sidebar ring-white"
                   : ""
@@ -118,7 +118,7 @@ export default function TemplateConfigPanel() {
                     className={`px-2 py-0.5 text-xs transition-colors ${
                       templateConfig[field] === align
                         ? "bg-accent text-white"
-                        : "bg-bg-input text-text-muted hover:text-text-primary"
+                        : "bg-bg-input text-text-muted hover:text-text-primary cursor-pointer"
                     }`}
                   >
                     {align === "left" ? "L" : "C"}

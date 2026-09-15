@@ -60,7 +60,7 @@ export default function ResumeForm({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+            className={`hover:cursor-pointer px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
               activeTab === tab.id
                 ? "border-accent text-accent"
                 : "border-transparent text-text-muted hover:text-text-primary"

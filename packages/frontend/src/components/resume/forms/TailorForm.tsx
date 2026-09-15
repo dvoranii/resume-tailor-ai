@@ -127,7 +127,7 @@ export default function TailorForm({ resumeId }: { resumeId?: number }) {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste or edit the job description here..."
               rows={12}
-              className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+              className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
             />
           </div>
 
@@ -136,7 +136,7 @@ export default function TailorForm({ resumeId }: { resumeId?: number }) {
               <button
                 onClick={handleViewChanges}
                 disabled={loadingDiff}
-                className="flex items-center gap-1.5 text-accent hover:underline text-sm px-3 py-1.5 disabled:opacity-50"
+                className="flex items-center gap-1.5 text-accent hover:underline text-sm px-3 py-1.5 disabled:opacity-50 cursor-pointer"
               >
                 <Eye size={15} />
                 {loadingDiff ? "Loading..." : "View Changes"}

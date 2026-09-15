@@ -9,8 +9,8 @@ import ResumeForm from "../components/resume/ResumeForm";
 import ResumePreview from "../components/resume/ResumePreview";
 import TemplateConfigPanel from "../components/resume/TemplateConfigPanel";
 
-import type { Resume } from "@resumeai/shared";
 import DiffModal from "../components/diff/DiffModal";
+import { useDiffModal } from "../hooks/useDiffModal";
 
 import {
   clearActiveResumeId,
@@ -21,7 +21,6 @@ import {
   clearActiveVariantId,
   clearActiveState,
 } from "../utils/activeResume";
-import { API_BASE } from "../types/jobs";
 
 function ResumeBuilderContent() {
   const {
@@ -44,12 +43,13 @@ function ResumeBuilderContent() {
   const isNew = searchParams.get("new") === "true";
   const showDiffParam = searchParams.get("showDiff") === "true";
 
-  const [showDiffModal, setShowDiffModal] = useState(false);
-  const [diffData, setDiffData] = useState<{
-    original: Resume;
-    tailored: Resume;
-  } | null>(null);
-  const [loadingDiff, setLoadingDiff] = useState(false);
+  const {
+    showDiffModal,
+    diffData,
+    loadingDiff,
+    openDiffModal,
+    closeDiffModal,
+  } = useDiffModal();
 
   const navigate = useNavigate();
 
@@ -94,7 +94,7 @@ function ResumeBuilderContent() {
 
   useEffect(() => {
     if (showDiffParam && isVariant && variantId && !showDiffModal) {
-      handleViewChanges();
+      openDiffModal(Number(variantId));
       const newParams = new URLSearchParams(searchParams);
       newParams.delete("showDiff");
       navigate(`${window.location.pathname}?${newParams.toString()}`, {
@@ -132,31 +132,7 @@ function ResumeBuilderContent() {
   };
 
   const handleViewChanges = async () => {
-    if (!variantId) return;
-    setLoadingDiff(true);
-    try {
-      const variantRes = await fetch(
-        `${API_BASE}/resume/variants/${variantId}`
-      );
-      const variantData = await variantRes.json();
-      const baseResumeId = variantData.resumeId;
-      if (!baseResumeId) {
-        alert("Could not find base resume for this variant.");
-        return;
-      }
-      const originalRes = await fetch(`${API_BASE}/resume?id=${baseResumeId}`);
-      const originalData = await originalRes.json();
-      setDiffData({
-        original: originalData,
-        tailored: variantData.tailoredData,
-      });
-      setShowDiffModal(true);
-    } catch (error) {
-      console.error("Failed to load diff:", error);
-      alert("Failed to load changes.");
-    } finally {
-      setLoadingDiff(false);
-    }
+    if (variantId) openDiffModal(Number(variantId));
   };
 
   const headerTitle = isVariant
@@ -227,7 +203,7 @@ function ResumeBuilderContent() {
           tailored={diffData.tailored}
           jobTitle={variantJobTitle}
           companyName={variantCompany}
-          onClose={() => setShowDiffModal(false)}
+          onClose={closeDiffModal}
         />
       )}
     </>
