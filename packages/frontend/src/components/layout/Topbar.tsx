@@ -2,7 +2,13 @@ import { Sun, HelpCircle } from "lucide-react";
 
 export default function Topbar() {
   return (
-    <header className="flex items-center justify-end gap-3 px-6 py-3 border-b border-border bg-[#0e1626]">
+    <header
+      className="flex items-center justify-end gap-3 px-6 py-3 border-b border-border bg-[#0e1626]"
+      style={{
+        background:
+          "linear-gradient(90deg, rgba(14,23,38,1) 25%, rgba(75,89,112,1) 80%, rgba(14,23,38,1) 95%)",
+      }}
+    >
       <button className="text-text-muted hover:text-text-primary transition-colors">
         <Sun size={18} />
       </button>
