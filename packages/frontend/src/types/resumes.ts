@@ -16,12 +16,19 @@ export interface RawResume {
   updatedAt: string;
 }
 
+export interface ResumeResponse extends Resume {
+  id: number;
+  name: string;
+  templateConfig: TemplateConfig | null;
+}
+
 export interface Variant {
   id: number;
   resumeId: number;
   jobTitle: string;
   companyName: string;
   tailoredData: Resume;
+  templateConfig: TemplateConfig | null;
   createdAt: string;
 }
 

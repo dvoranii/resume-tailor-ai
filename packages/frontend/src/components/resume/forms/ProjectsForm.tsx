@@ -61,7 +61,7 @@ function ProjectCard({ project, onChange, onDelete }: ProjectCardProps) {
     });
 
   return (
-    <div className="border border-border rounded-lg bg-bg-surface">
+    <div className="border border-border rounded-lg bg-bg-base">
       <div className="flex items-center gap-3 px-4 py-3">
         <GripVertical size={16} className="text-text-muted shrink-0" />
         <div className="flex-1 min-w-0">

@@ -6,6 +6,7 @@ import type {
   RawResume,
   SaveResumePayload,
   ExportPayload,
+  ResumeResponse,
 } from "../types/resumes";
 
 export function convertToBaseResume(raw: RawResume): BaseResume {
@@ -61,7 +62,9 @@ export async function fetchBaseResumeById(id: number): Promise<Resume> {
 
 // CONTEXT
 
-export async function fetchResume(id?: number | null): Promise<Resume | null> {
+export async function fetchResume(
+  id?: number | null
+): Promise<ResumeResponse | null> {
   const url = id ? `${API_BASE}/resume?id=${id}` : `${API_BASE}/resume`;
   const response = await fetch(url);
   if (response.status === 404) return null;

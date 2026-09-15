@@ -75,7 +75,7 @@ function CategoryCard({ category, onChange, onDelete }: CategoryCardProps) {
   };
 
   return (
-    <div className="border border-border rounded-lg bg-bg-surface p-4 flex flex-col gap-3">
+    <div className="border border-border rounded-lg bg-bg-base p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <GripVertical size={16} className="text-text-muted shrink-0" />
         <input

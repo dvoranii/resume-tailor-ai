@@ -17,7 +17,6 @@ const navItems = [
 export default function Sidebar() {
   return (
     <aside className="flex flex-col w-56 h-full bg-bg-sidebar border-r border-border">
-      {/* Logo */}
       <div className="flex items-center gap-2 px-5 py-5 border-b border-border">
         <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
           <FileText size={15} className="text-white" />
@@ -27,7 +26,6 @@ export default function Sidebar() {
         </span>
       </div>
 
-      {/* Nav */}
       <nav className="flex flex-col gap-1 px-3 py-4 flex-1">
         {navItems.map(({ label, icon: Icon, path }) => (
           <NavLink

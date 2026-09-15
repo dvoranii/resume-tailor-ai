@@ -74,7 +74,7 @@ function RoleCard({ role, onChange, onDelete }: RoleCardProps) {
     onChange({ ...role, bullets: role.bullets.filter((_, i) => i !== index) });
 
   return (
-    <div className="border border-border rounded-md bg-bg-base">
+    <div className="border border-border rounded-md bg-[#192334]">
       <div className="flex items-center gap-2 px-4 py-3">
         <PenLine size={14} className="text-text-muted shrink-0" />
         <span className="flex-1 text-sm text-text-primary font-medium truncate">
@@ -198,7 +198,7 @@ function CompanyCard({ company, onChange, onDelete }: CompanyCardProps) {
     });
 
   return (
-    <div className="border border-border rounded-lg bg-bg-surface">
+    <div className="border border-border rounded-lg bg-bg-base">
       <div className="flex items-center gap-3 px-4 py-3">
         <GripVertical size={16} className="text-text-muted shrink-0" />
         <div className="flex-1 min-w-0">

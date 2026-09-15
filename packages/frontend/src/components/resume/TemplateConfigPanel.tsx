@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, Save } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { useResumeBuilder } from "../../context/ResumeBuilderContext";
 import type { SectionId } from "@resumeai/shared";
 
@@ -23,13 +23,7 @@ const PRESET_COLORS = [
 export default function TemplateConfigPanel() {
   const { templateConfig, updateTemplateConfig } = useResumeBuilder();
 
-  const {
-    sectionOrder,
-    sectionTitleColor,
-    // nameAlignment,
-    // titleAlignment,
-    // summaryAlignment,
-  } = templateConfig;
+  const { sectionOrder, sectionTitleColor } = templateConfig;
 
   const moveSection = (index: number, direction: "up" | "down") => {
     const newOrder = [...sectionOrder];

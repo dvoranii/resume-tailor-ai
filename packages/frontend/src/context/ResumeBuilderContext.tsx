@@ -111,10 +111,10 @@ export function ResumeBuilderProvider({
 
         setResume(data);
         setCurrentResumeId(id || null);
-        setResumeName((data as any).name || "Untitled");
 
-        if ((data as any).templateConfig) {
-          setTemplateConfig((data as any).templateConfig);
+        setResumeName(data.name || "Untitled");
+        if (data.templateConfig) {
+          setTemplateConfig(data.templateConfig);
         } else {
           setTemplateConfig(defaultTemplateConfig);
         }

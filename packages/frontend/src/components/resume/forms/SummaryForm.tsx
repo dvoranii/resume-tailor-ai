@@ -23,7 +23,7 @@ export default function SummaryForm() {
           onChange={(e) => updateSummary(e.target.value)}
           placeholder="Full Stack Developer with X years of experience building scalable web applications..."
           rows={6}
-          className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+          className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
         />
         <div className="flex justify-end">
           <span

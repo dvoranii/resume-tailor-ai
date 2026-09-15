@@ -91,7 +91,7 @@ export default function TailorForm({ resumeId }: { resumeId?: number }) {
         <select
           value={selectedJobId ?? ""}
           onChange={(e) => handleJobSelect(Number(e.target.value))}
-          className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+          className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
           disabled={jobsLoading}
         >
           <option value="" disabled>

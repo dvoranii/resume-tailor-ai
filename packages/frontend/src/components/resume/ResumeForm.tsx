@@ -54,7 +54,7 @@ export default function ResumeForm({
   };
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 bg-bg-surface rounded-lg border border-border overflow-hidden">
+    <div className="flex flex-col flex-1 min-w-0 bg-[#192334] rounded-lg border border-border overflow-hidden">
       <div className="flex border-b border-border overflow-x-auto shrink-0 justify-evenly">
         {tabs.map((tab) => (
           <button
@@ -71,7 +71,9 @@ export default function ResumeForm({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">{renderTab()}</div>
+      <div className="flex-1 overflow-y-auto p-6 bg-bg-surface">
+        {renderTab()}
+      </div>
     </div>
   );
 }
