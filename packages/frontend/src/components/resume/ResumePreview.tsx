@@ -1,5 +1,4 @@
 import { useResumeBuilder } from "../../context/ResumeBuilderContext";
-// import type { SectionId } from "@resumeai/shared";
 import { Mail, Phone, MapPin, Globe } from "lucide-react";
 import linkedinIcon from "../../assets/linked-icon.svg";
 import githubIcon from "../../assets/github-icon.svg";

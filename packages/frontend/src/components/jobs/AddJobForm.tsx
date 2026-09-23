@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
-import { API_BASE, type Job } from "../../types/jobs";
+import type { Job } from "../../types/jobs";
+import { createJob } from "../../services/jobs";
 
 export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -35,27 +36,20 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          fitScore: form.fitScore ? Number(form.fitScore) : null,
-        }),
+      const { id } = await createJob({
+        ...form,
+        fitScore: form.fitScore ? Number(form.fitScore) : null,
       });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || "Failed to add job");
-        return;
-      }
+
       onAdd({
         ...form,
-        id: data.id,
+        id,
         fitScore: form.fitScore ? Number(form.fitScore) : null,
         status: "new",
         variantId: null,
         collectionId: null,
       } as Job);
+
       setForm({
         companyName: "",
         jobTitle: "",
@@ -156,7 +150,7 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
                   min={min}
                   max={max}
                   step={step}
-                  className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+                  className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
                 />
               </div>
             ))}
@@ -170,7 +164,7 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
               onChange={handleChange}
               placeholder="Paste the full job description here..."
               rows={6}
-              className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+              className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
             />
           </div>
 
@@ -182,7 +176,7 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
               value={form.suggestedFocus}
               onChange={handleChange}
               placeholder="Emphasize React, TypeScript, and API design"
-              className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+              className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
@@ -194,7 +188,7 @@ export default function AddJobForm({ onAdd }: { onAdd: (job: Job) => void }) {
               onChange={handleChange}
               placeholder="Why this job is a good fit..."
               rows={3}
-              className="bg-bg-input border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+              className="bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
             />
           </div>
 

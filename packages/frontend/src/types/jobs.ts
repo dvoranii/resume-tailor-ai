@@ -14,6 +14,18 @@ export interface Job {
   collectionId: number | null;
 }
 
+export interface CreateJobPayload {
+  companyName: string;
+  jobTitle: string;
+  jobUrl?: string;
+  jobDescription?: string;
+  fitScore?: number | null;
+  seniorityLevel?: string;
+  salary?: string;
+  suggestedFocus?: string;
+  reasoning?: string;
+}
+
 export interface Collection {
   id: number;
   name: string;
